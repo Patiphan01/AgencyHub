@@ -1,28 +1,16 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import Badge from '../../components/Badge'
 import DataTable from '../../components/DataTable'
+import EmptyState from '../../components/EmptyState'
 import ProgressBar from '../../components/ProgressBar'
 import StatCard from '../../components/StatCard'
 import { useLanguage } from '../../context/LanguageContext'
-import { campaigns, currentStaffName, getStatusVariant, influencers, tasks, tierTargets } from '../../mock/agencyData'
+import { brands, campaigns, currentStaffName, getStatusVariant, influencers, tasks, tierTargets } from '../../mock/agencyData'
 
 function StaffDashboard() {
   const { t } = useLanguage()
   const assignedCampaigns = campaigns.filter((campaign) => campaign.status !== 'Posted')
-  const columns = [
-    { key: 'name', label: 'Influencer' },
-    { key: 'tier', label: 'Tier' },
-    { key: 'followers', label: 'Followers' },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (row) => <Badge variant={getStatusVariant(row.status)}>{row.status}</Badge>,
-    },
-    {
-      key: 'draftStatus',
-      label: 'Content',
-      render: (row) => <Badge variant={getStatusVariant(row.draftStatus)}>{row.draftStatus}</Badge>,
-    },
-  ]
 
   return (
     <section className="stack">
@@ -40,56 +28,44 @@ function StaffDashboard() {
         <StatCard label={t.staff.openTasks} value={tasks.length} detail={t.staff.openTasksDetail} tone="orange" />
       </div>
 
-      <div className="card-grid">
-        {assignedCampaigns.map((campaign) => (
-          <article className="info-card" key={campaign.id}>
-            <div className="card-title-row">
-              <h3>{campaign.name}</h3>
-              <Badge variant={getStatusVariant(campaign.status)}>{campaign.status}</Badge>
-            </div>
-            <p>{campaign.brandName}</p>
-            <strong>{campaign.confirmedInfluencers} {t.staff.confirmedSuffix}</strong>
-          </article>
-        ))}
-      </div>
-
-      <div className="card-grid">
-        <article className="info-card">
-          <h3>ความคืบหน้าการหา Influencer</h3>
-          {tierTargets.map((target) => (
-            <ProgressBar
-              key={target.tier}
-              label={target.tier}
-              value={Math.round((target.ownerApproved / target.target) * 100)}
-            />
-          ))}
-        </article>
-        <article className="info-card">
-          <h3>Deadline ที่ใกล้ถึง</h3>
-          <div className="mini-list">
-            {assignedCampaigns.map((campaign) => (
-              <div key={campaign.id}>
-                <strong>{campaign.name}</strong>
-                <span>{campaign.dueDate}</span>
-              </div>
-            ))}
-          </div>
-        </article>
-      </div>
-
       <div className="section-heading">
         <div>
-          <h2>{t.staff.managementTitle}</h2>
-          <p>{t.staff.managementText}</p>
+          <h2>Brands</h2>
+          <p>เลือกแบรนด์เพื่อดูแคมเปญและงาน</p>
         </div>
       </div>
-      <DataTable
-        columns={columns}
-        rowClassName={(row) => (row.addedBy !== currentStaffName ? 'readonly-row' : '')}
-        rows={influencers}
-      />
+
+      <div className="card-grid">
+        {brands.map((brand) => {
+          const brandCampaigns = campaigns.filter((c) => c.brandId === brand.id)
+          const totalProgress = Math.round(
+            brandCampaigns.reduce((sum, c) => sum + c.progress, 0) / (brandCampaigns.length || 1),
+          )
+
+          return (
+            <Link className="info-card" key={brand.id} to={`/brands/${brand.id}`}>
+              <div className="card-title-row">
+                <h3>{brand.name}</h3>
+                <Badge variant="info">{brand.activeCampaigns} campaigns</Badge>
+              </div>
+              <p>{brand.category}</p>
+              <ProgressBar value={totalProgress} label={`Progress: ${totalProgress}%`} />
+              <span className="muted">{brandCampaigns.length} แคมเปญที่ได้รับมอบหมาย</span>
+            </Link>
+          )
+        })}
+      </div>
+
+      {assignedCampaigns.length === 0 && (
+        <EmptyState
+          title="ไม่มีแคมเปญที่ได้รับมอบหมาย"
+          description="ติดต่อหัวหน้าเพื่อรับมอบหมายแคมเปญใหม่"
+          icon="📋"
+        />
+      )}
     </section>
   )
 }
 
 export default StaffDashboard
+

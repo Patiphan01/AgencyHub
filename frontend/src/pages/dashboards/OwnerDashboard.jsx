@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import ActivityTimeline from '../../components/ActivityTimeline'
 import CampaignCard from '../../components/CampaignCard'
+import EmptyState from '../../components/EmptyState'
 import StatCard from '../../components/StatCard'
 import { useLanguage } from '../../context/LanguageContext'
 import { activities, brands, campaigns, influencers, notifications } from '../../mock/agencyData'
@@ -17,10 +19,18 @@ function OwnerDashboard() {
     { confirmed: 0, posted: 0, pending: 0 },
   )
   const ownerNotifications = notifications.filter((notification) => notification.role === 'Owner')
+  const pendingSelections = campaigns.reduce(
+    (sum, campaign) => sum + (campaign.waitingBrandSelection || 0),
+    0,
+  )
+
+  function showToast(message) {
+    setToast(message)
+    window.setTimeout(() => setToast(''), 2200)
+  }
 
   function handleExport() {
-    setToast('Export Excel สำเร็จ (Mockup)')
-    window.setTimeout(() => setToast(''), 2200)
+    showToast('Export Excel สำเร็จ (Mockup)')
   }
 
   return (
@@ -33,8 +43,12 @@ function OwnerDashboard() {
           <p>{t.owner.description}</p>
         </div>
         <div className="button-row">
-          <button className="secondary-button" onClick={handleExport} type="button">Export Excel</button>
-          <button className="primary-button" type="button">{t.owner.action}</button>
+          <button className="secondary-button" onClick={handleExport} type="button">
+            Export Excel
+          </button>
+          <Link className="primary-button" to="/brands" style={{ textDecoration: 'none' }}>
+            {t.owner.action}
+          </Link>
         </div>
       </div>
 
@@ -42,15 +56,27 @@ function OwnerDashboard() {
         <StatCard label={t.owner.totalCampaigns} value={campaigns.length} detail={t.owner.totalCampaignsDetail} />
         <StatCard label="Brands" value={brands.length} detail={t.owner.brandsDetail} tone="blue" />
         <StatCard label="Influencers" value={influencers.length} detail={t.owner.influencersDetail} tone="green" />
-        <StatCard label={t.owner.pendingReview} value={totals.pending} detail={t.owner.pendingReviewDetail} tone="orange" />
+        <StatCard label={t.owner.pendingReview} value={pendingSelections} detail="รอบรรจุให้แบรนด์เลือก" tone="orange" />
       </div>
 
       <div className="card-grid">
         <article className="info-card">
-          <p className="eyebrow">All Brands</p>
-          <h3>ภาพรวมทุกแบรนด์</h3>
-          <p>{brands.map((brand) => brand.name).join(' / ')}</p>
-          <strong>{brands.reduce((sum, brand) => sum + brand.activeCampaigns, 0)} active campaigns</strong>
+          <p className="eyebrow">Summary</p>
+          <h3>ภาพรวมการดำเนินการทั้งหมด</h3>
+          <div className="mini-list">
+            <div>
+              <strong>ยืนยันแล้ว</strong>
+              <span>{totals.confirmed} Influencers</span>
+            </div>
+            <div>
+              <strong>ลงคลิปแล้ว</strong>
+              <span>{totals.posted} posts</span>
+            </div>
+            <div>
+              <strong>รอตรวจ</strong>
+              <span>{totals.pending} items</span>
+            </div>
+          </div>
         </article>
         <article className="info-card">
           <p className="eyebrow">Notification Summary</p>
@@ -74,19 +100,57 @@ function OwnerDashboard() {
 
       <div className="section-heading">
         <div>
+          <h2>Brands Overview</h2>
+          <p>ภาพรวมทุกแบรนด์และแคมเปญของพวกเขา</p>
+        </div>
+        <Link className="primary-button" to="/brands" style={{ textDecoration: 'none' }}>
+          ดูทั้งหมด →
+        </Link>
+      </div>
+
+      <div className="card-grid">
+        {brands.slice(0, 4).map((brand) => {
+          const brandCampaigns = campaigns.filter((c) => c.brandId === brand.id)
+          return (
+            <Link className="info-card" key={brand.id} to={`/brands/${brand.id}`} style={{ textDecoration: 'none' }}>
+              <div className="card-title-row">
+                <h3>{brand.name}</h3>
+              </div>
+              <p>{brand.category}</p>
+              <strong>{brandCampaigns.length} campaigns</strong>
+            </Link>
+          )
+        })}
+      </div>
+
+      <div className="section-heading">
+        <div>
           <h2>{t.owner.latestCampaigns}</h2>
           <p>{t.owner.latestCampaignsText}</p>
         </div>
+        <Link className="primary-button" to="/campaigns" style={{ textDecoration: 'none' }}>
+          ดูทั้งหมด →
+        </Link>
       </div>
       <div className="campaign-grid">
-        {campaigns.map((campaign) => (
+        {campaigns.slice(0, 4).map((campaign) => (
           <CampaignCard campaign={campaign} key={campaign.id} />
         ))}
       </div>
 
-      <ActivityTimeline activities={activities.slice(0, 5)} title="Recent Activities" />
+      {campaigns.length > 0 && <ActivityTimeline activities={activities.slice(0, 5)} title="Recent Activities" />}
+      {campaigns.length === 0 && (
+        <EmptyState
+          title="ไม่มีแคมเปญ"
+          description="ไปที่หน้า Brands เพื่อสร้างแคมเปญใหม่"
+          icon="🚀"
+          action={() => window.location.href = '/brands'}
+          actionLabel="ไปสร้างแคมเปญ"
+        />
+      )}
     </section>
   )
 }
 
 export default OwnerDashboard
+
