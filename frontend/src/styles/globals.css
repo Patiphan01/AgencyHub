@@ -1065,6 +1065,8 @@ button {
   --danger-light: #fbeae9;
   --muted: #9097a8;
   --muted-light: #f0f1f5;
+  --purple: #7c3aed;
+  --purple-light: #ede9fe;
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
@@ -1371,6 +1373,11 @@ button {
   color: var(--muted);
 }
 
+.agency-mockup .badge.purple {
+  background: var(--purple-light);
+  color: var(--purple);
+}
+
 .agency-mockup .tier-dot {
   display: inline-block;
   width: 8px;
@@ -1451,10 +1458,26 @@ button {
   color: var(--text);
 }
 
+.agency-mockup .btn.success {
+  background: var(--success);
+  color: #ffffff;
+}
+
+.agency-mockup .btn.danger-btn {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
 .agency-mockup .btn.sm {
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 12px;
+}
+
+.agency-mockup .btn.xs {
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .agency-mockup .tabs {
@@ -1562,6 +1585,204 @@ button {
   color: var(--text);
   font-size: 14px;
   font-weight: 800;
+}
+
+.agency-mockup .channel-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.agency-mockup .ch-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--muted-light);
+  color: var(--text2);
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.agency-mockup .ch-pill.ig {
+  background: #fce4ec;
+  color: #c2185b;
+}
+
+.agency-mockup .ch-pill.tt {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.agency-mockup .ch-pill.yt {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.agency-mockup .ch-pill.fb {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.agency-mockup .ch-pill.tw {
+  background: #e1f5fe;
+  color: #0277bd;
+}
+
+.agency-mockup .ch-pill.lemon8 {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.agency-mockup .bank-chip,
+.agency-mockup .senior-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.agency-mockup .bank-chip {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.agency-mockup .senior-chip {
+  background: var(--purple-light);
+  color: var(--purple);
+}
+
+.agency-mockup .title-chip {
+  margin-left: 8px;
+}
+
+.agency-mockup .owner-head {
+  margin-bottom: 8px;
+}
+
+.agency-mockup .owner-stats {
+  margin-top: 14px;
+}
+
+.agency-mockup .no-margin {
+  margin-bottom: 0;
+}
+
+.agency-mockup .mini-title {
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.agency-mockup .senior-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.agency-mockup .senior-card,
+.agency-mockup .senior-person,
+.agency-mockup .senior-permission-row,
+.agency-mockup .permission-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agency-mockup .senior-card {
+  border-radius: 10px;
+  background: var(--purple-light);
+  padding: 10px 14px;
+}
+
+.agency-mockup .senior-avatar {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.agency-mockup .senior-avatar.small {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.agency-mockup .senior-permission-row {
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 8px 0;
+  padding: 10px;
+}
+
+.agency-mockup .add-brand-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text2);
+  padding: 20px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.agency-mockup .add-brand-card:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.agency-mockup .modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.agency-mockup .modal {
+  width: min(520px, 90vw);
+  border-radius: 16px;
+  background: var(--card);
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+}
+
+.agency-mockup .modal h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.agency-mockup .modal-sub {
+  margin-bottom: 18px;
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.agency-mockup .modal-field {
+  margin-top: 10px;
+}
+
+.agency-mockup .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
 }
 
 .agency-mockup .table-heading {

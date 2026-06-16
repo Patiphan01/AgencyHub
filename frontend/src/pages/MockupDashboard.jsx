@@ -9,9 +9,14 @@ const TIER_COLOR = {
   Macro: '#EF4444',
   Mega: '#8B5CF6',
 }
+const CHANNELS = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'lemon8']
+const CH_LABEL = { instagram: 'IG', tiktok: 'TikTok', youtube: 'YT', facebook: 'FB', twitter: 'X', lemon8: 'Lemon8' }
+const CH_CLASS = { instagram: 'ig', tiktok: 'tt', youtube: 'yt', facebook: 'fb', twitter: 'tw', lemon8: 'lemon8' }
+const THAI_BANKS = ['ธ.กสิกรไทย', 'ธ.กรุงเทพ', 'ธ.ไทยพาณิชย์', 'ธ.กรุงไทย', 'ธ.ทหารไทยธนชาต', 'Promptpay']
 
 const STATUS_MAP = {
   pending_owner: { label: 'รอหัวหน้าตรวจ', cls: 'warning' },
+  senior_approved: { label: 'Senior อนุมัติ · รอหัวหน้า', cls: 'purple' },
   owner_approved: { label: 'หัวหน้าคัดผ่าน · รอแบรนด์เลือก', cls: 'primary' },
   owner_rejected: { label: 'หัวหน้าคัดออก', cls: 'muted' },
   brand_selected: { label: 'แบรนด์เลือกแล้ว', cls: 'success' },
@@ -66,16 +71,16 @@ const DB = {
             Mega: makeStats({ target: 5, sourced: 4, oa: 3, bs: 3, posted: 1 }),
           },
           influencers: [
-            { id: 1, name: 'Mai Cosmetic Diary', channel: 'instagram.com/maicosmeticdiary', tier: 'Nano', followers: '8.4K', addedBy: 'แนน', dealDate: '20 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '5 ก.ค. 2569', postLink: 'instagram.com/p/abc123' },
-            { id: 2, name: 'Beauty by Ploy', channel: 'tiktok.com/@beautybyploy', tier: 'Micro', followers: '32K', addedBy: 'แนน', dealDate: '22 มิ.ย. 2569', status: 'confirmed', draft: 'approved', postDate: '-', postLink: '' },
-            { id: 3, name: 'SkinCareGuy', channel: 'youtube.com/skincareguy', tier: 'Nano', followers: '6.1K', addedBy: 'ต้น', dealDate: '21 มิ.ย. 2569', status: 'confirmed', draft: 'revise', postDate: '-', postLink: '' },
-            { id: 4, name: 'Fah Beauty Talk', channel: 'instagram.com/fahbeautytalk', tier: 'Mid', followers: '88K', addedBy: 'ต้น', dealDate: '23 มิ.ย. 2569', status: 'confirmed', draft: 'review', postDate: '-', postLink: '' },
-            { id: 5, name: 'Glow with Gam', channel: 'tiktok.com/@glowwithgam', tier: 'Macro', followers: '420K', addedBy: 'แนน', dealDate: '25 มิ.ย. 2569', status: 'confirmed', draft: 'waiting', postDate: '-', postLink: '' },
-            { id: 6, name: 'The Skin Diary', channel: 'instagram.com/theskindiary', tier: 'Micro', followers: '45K', addedBy: 'บีม', dealDate: '-', status: 'brand_selected', draft: '', postDate: '', postLink: '' },
-            { id: 7, name: 'Nicha Reviews', channel: 'tiktok.com/@nichareviews', tier: 'Nano', followers: '4.2K', addedBy: 'บีม', dealDate: '-', status: 'owner_approved', draft: '', postDate: '', postLink: '' },
-            { id: 8, name: 'Cosmetic King', channel: 'youtube.com/cosmeticking', tier: 'Mega', followers: '1.4M', addedBy: 'ต้น', dealDate: '-', status: 'owner_approved', draft: '', postDate: '', postLink: '' },
-            { id: 9, name: 'Sweet Skin Sara', channel: 'instagram.com/sweetskinsara', tier: 'Micro', followers: '28K', addedBy: 'แนน', dealDate: '-', status: 'pending_owner', draft: '', postDate: '', postLink: '' },
-            { id: 10, name: 'Daily Glow TH', channel: 'tiktok.com/@dailyglowth', tier: 'Nano', followers: '9.8K', addedBy: 'บีม', dealDate: '-', status: 'owner_rejected', draft: '', postDate: '', postLink: '' },
+            { id: 1, name: 'Mai Cosmetic Diary', channels: [{ type: 'instagram', url: 'instagram.com/maicosmeticdiary' }, { type: 'tiktok', url: 'tiktok.com/@maicosmeticdiary' }], tier: 'Nano', followers: '8.4K', addedBy: 'แนน', addedByRole: 'staff', dealDate: '20 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '5 ก.ค. 2569', postLink: 'instagram.com/p/abc123', assetLink: 'drive.google.com/folders/glowskin01', bank: { name: 'ธ.กสิกรไทย', account: '0123456789', holder: 'นางสาว มาย' }, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 2, name: 'Beauty by Ploy', channels: [{ type: 'tiktok', url: 'tiktok.com/@beautybyploy' }, { type: 'instagram', url: 'instagram.com/beautybyploy' }], tier: 'Micro', followers: '32K', addedBy: 'แนน', addedByRole: 'staff', dealDate: '22 มิ.ย. 2569', status: 'confirmed', draft: 'approved', postDate: '-', postLink: '', assetLink: '', bank: { name: 'ธ.กรุงเทพ', account: '9876543210', holder: 'นางสาว พลอย' }, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 3, name: 'SkinCareGuy', channels: [{ type: 'youtube', url: 'youtube.com/skincareguy' }], tier: 'Nano', followers: '6.1K', addedBy: 'ต้น', addedByRole: 'staff', dealDate: '21 มิ.ย. 2569', status: 'confirmed', draft: 'revise', postDate: '-', postLink: '', assetLink: '', bank: { name: 'ธ.ไทยพาณิชย์', account: '1111222233', holder: 'นาย ต้น' }, seniorApproval: { name: 'พี่ตั้ม', approved: false } },
+            { id: 4, name: 'Fah Beauty Talk', channels: [{ type: 'instagram', url: 'instagram.com/fahbeautytalk' }, { type: 'facebook', url: 'facebook.com/fahbeautytalk' }], tier: 'Mid', followers: '88K', addedBy: 'ต้น', addedByRole: 'staff', dealDate: '23 มิ.ย. 2569', status: 'confirmed', draft: 'review', postDate: '-', postLink: '', assetLink: '', bank: { name: 'ธ.กสิกรไทย', account: '5556667778', holder: 'นางสาว ฟ้า' }, seniorApproval: null },
+            { id: 5, name: 'Glow with Gam', channels: [{ type: 'tiktok', url: 'tiktok.com/@glowwithgam' }, { type: 'youtube', url: 'youtube.com/glowwithgam' }], tier: 'Macro', followers: '420K', addedBy: 'แนน', addedByRole: 'staff', dealDate: '25 มิ.ย. 2569', status: 'confirmed', draft: 'waiting', postDate: '-', postLink: '', assetLink: '', bank: { name: 'ธ.กรุงไทย', account: '9990001112', holder: 'นางสาว แกม' }, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 6, name: 'The Skin Diary', channels: [{ type: 'instagram', url: 'instagram.com/theskindiary' }, { type: 'lemon8', url: 'lemon8.com/@theskindiary' }], tier: 'Micro', followers: '45K', addedBy: 'บีม', addedByRole: 'staff', dealDate: '-', status: 'brand_selected', draft: '', postDate: '', postLink: '', assetLink: '', bank: null, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 7, name: 'Nicha Reviews', channels: [{ type: 'tiktok', url: 'tiktok.com/@nichareviews' }], tier: 'Nano', followers: '4.2K', addedBy: 'บีม', addedByRole: 'staff', dealDate: '-', status: 'owner_approved', draft: '', postDate: '', postLink: '', assetLink: '', bank: null, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 8, name: 'Cosmetic King', channels: [{ type: 'youtube', url: 'youtube.com/cosmeticking' }, { type: 'tiktok', url: 'tiktok.com/@cosmeticking' }], tier: 'Mega', followers: '1.4M', addedBy: 'หัวหน้า', addedByRole: 'owner', dealDate: '-', status: 'owner_approved', draft: '', postDate: '', postLink: '', assetLink: '', bank: null, seniorApproval: null },
+            { id: 9, name: 'Sweet Skin Sara', channels: [{ type: 'instagram', url: 'instagram.com/sweetskinsara' }], tier: 'Micro', followers: '28K', addedBy: 'แนน', addedByRole: 'staff', dealDate: '-', status: 'senior_approved', draft: '', postDate: '', postLink: '', assetLink: '', bank: null, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 10, name: 'Daily Glow TH', channels: [{ type: 'tiktok', url: 'tiktok.com/@dailyglowth' }], tier: 'Nano', followers: '9.8K', addedBy: 'บีม', addedByRole: 'staff', dealDate: '-', status: 'owner_rejected', draft: '', postDate: '', postLink: '', assetLink: '', bank: null, seniorApproval: { name: 'พี่ตั้ม', approved: false } },
           ],
         },
         {
@@ -97,10 +102,10 @@ const DB = {
             Mega: makeStats({ target: 2, sourced: 2, oa: 2, bs: 2, posted: 1 }),
           },
           influencers: [
-            { id: 11, name: 'Aom Sunny Day', channel: 'instagram.com/aomsunnyday', tier: 'Micro', followers: '38K', addedBy: 'แนน', dealDate: '5 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '18 มิ.ย. 2569', postLink: 'instagram.com/p/sun001' },
-            { id: 12, name: 'UV Defense TH', channel: 'tiktok.com/@uvdefenseth', tier: 'Nano', followers: '7.7K', addedBy: 'ต้น', dealDate: '4 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '17 มิ.ย. 2569', postLink: 'tiktok.com/@uvdefenseth/video/9981' },
-            { id: 13, name: 'Beach Skin Bun', channel: 'instagram.com/beachskinbun', tier: 'Mid', followers: '120K', addedBy: 'บีม', dealDate: '6 มิ.ย. 2569', status: 'confirmed', draft: 'revise', postDate: '-', postLink: '' },
-            { id: 14, name: 'Plern Beauty Lab', channel: 'youtube.com/plernbeautylab', tier: 'Macro', followers: '310K', addedBy: 'ต้น', dealDate: '7 มิ.ย. 2569', status: 'confirmed', draft: 'review', postDate: '-', postLink: '' },
+            { id: 11, name: 'Aom Sunny Day', channels: [{ type: 'instagram', url: 'instagram.com/aomsunnyday' }], tier: 'Micro', followers: '38K', addedBy: 'แนน', addedByRole: 'staff', dealDate: '5 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '18 มิ.ย. 2569', postLink: 'instagram.com/p/sun001', assetLink: 'drive.google.com/folders/spf001', bank: { name: 'ธ.กสิกรไทย', account: '1234567890', holder: 'นางสาว อ้อม' }, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 12, name: 'UV Defense TH', channels: [{ type: 'tiktok', url: 'tiktok.com/@uvdefenseth' }], tier: 'Nano', followers: '7.7K', addedBy: 'ต้น', addedByRole: 'staff', dealDate: '4 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '17 มิ.ย. 2569', postLink: 'tiktok.com/@uvdefenseth/video/9981', assetLink: '', bank: { name: 'ธ.กรุงเทพ', account: '9876500000', holder: 'นาย ยูวี' }, seniorApproval: null },
+            { id: 13, name: 'Beach Skin Bun', channels: [{ type: 'instagram', url: 'instagram.com/beachskinbun' }, { type: 'lemon8', url: 'lemon8.com/@beachskinbun' }], tier: 'Mid', followers: '120K', addedBy: 'บีม', addedByRole: 'staff', dealDate: '6 มิ.ย. 2569', status: 'confirmed', draft: 'revise', postDate: '-', postLink: '', assetLink: '', bank: { name: 'ธ.ไทยพาณิชย์', account: '5554443332', holder: 'นางสาว บุน' }, seniorApproval: { name: 'พี่ตั้ม', approved: true } },
+            { id: 14, name: 'Plern Beauty Lab', channels: [{ type: 'youtube', url: 'youtube.com/plernbeautylab' }], tier: 'Macro', followers: '310K', addedBy: 'ต้น', addedByRole: 'staff', dealDate: '7 มิ.ย. 2569', status: 'confirmed', draft: 'review', postDate: '-', postLink: '', assetLink: '', bank: { name: 'ธ.กสิกรไทย', account: '3331112220', holder: 'นางสาว เพลิน' }, seniorApproval: null },
             { id: 15, name: 'Cherry Sunscreen Diary', channel: 'tiktok.com/@cherrysunscreen', tier: 'Micro', followers: '21K', addedBy: 'แนน', dealDate: '8 มิ.ย. 2569', status: 'confirmed', draft: 'approved', postDate: '-', postLink: '' },
             { id: 16, name: 'SkinFirst Nat', channel: 'instagram.com/skinfirstnat', tier: 'Nano', followers: '5.5K', addedBy: 'บีม', dealDate: '9 มิ.ย. 2569', status: 'confirmed', draft: 'waiting', postDate: '-', postLink: '' },
           ],
@@ -135,6 +140,7 @@ const DB = {
       ],
     },
   ],
+  seniors: [{ id: 's1', name: 'พี่ตั้ม', role: 'Senior Manager' }, { id: 's2', name: 'พี่นก', role: 'Senior Coordinator' }],
 }
 
 function totalTier(campaign, key) {
@@ -178,6 +184,37 @@ function StatusBadge({ status }) {
 function DraftBadge({ draft }) {
   const draftData = DRAFT_MAP[draft]
   return draftData ? <Badge cls={draftData.cls}>{draftData.label}</Badge> : <span className="muted-text">—</span>
+}
+
+function getChannels(item) {
+  if (item.channels?.length) return item.channels
+  if (!item.channel) return []
+  const type = item.channel.includes('tiktok') ? 'tiktok' : item.channel.includes('youtube') ? 'youtube' : item.channel.includes('facebook') ? 'facebook' : 'instagram'
+  return [{ type, url: item.channel }]
+}
+
+function ChannelPills({ item }) {
+  const channels = getChannels(item)
+  if (!channels.length) return <span className="muted-text">ไม่มีข้อมูล</span>
+  return (
+    <div className="channel-pills">
+      {channels.map((channel) => (
+        <span className={`ch-pill ${CH_CLASS[channel.type] || ''}`} key={`${channel.type}-${channel.url}`}>
+          {CH_LABEL[channel.type] || channel.type}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function BankChip({ bank }) {
+  if (!bank) return <span className="muted-text">ยังไม่ได้ใส่</span>
+  return <span className="bank-chip">{bank.name} · {bank.account}</span>
+}
+
+function SeniorChip({ approval }) {
+  if (!approval) return <span className="muted-text">—</span>
+  return approval.approved ? <span className="senior-chip">✓ {approval.name}</span> : <Badge cls="muted">✗ {approval.name}</Badge>
 }
 
 function EmptyState({ icon, title, desc }) {
@@ -227,6 +264,7 @@ function MockupDashboard() {
     return { role, view: 'dashboard', brandId: null, campaignId: null, tab: role === 'owner' ? 'review' : 'source' }
   })
   const [selectedCandidateIds, setSelectedCandidateIds] = useState(() => new Set())
+  const [modal, setModal] = useState(null)
   const allCampaigns = useMemo(() => DB.brands.flatMap((brand) => brand.campaigns.map((campaign) => ({ ...campaign, brandName: brand.name, brandId: brand.id }))), [])
 
   function go(next) {
@@ -282,10 +320,10 @@ function MockupDashboard() {
             : <BrandCampaign campaign={getCampaign(DB.brands[0].id, state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} />)}
 
           {state.role === 'owner' && (state.view === 'dashboard'
-            ? <OwnerDashboard allCampaigns={allCampaigns} go={go} />
+            ? <OwnerDashboard allCampaigns={allCampaigns} go={go} openModal={setModal} />
             : state.view === 'brand'
               ? <OwnerBrand brand={getBrand(state.brandId)} go={go} />
-              : <OwnerCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} />)}
+              : <OwnerCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} openModal={setModal} />)}
 
           {state.role === 'staff' && (state.view === 'dashboard'
             ? <StaffDashboard allCampaigns={allCampaigns} go={go} />
@@ -293,6 +331,7 @@ function MockupDashboard() {
               ? <StaffBrand brand={getBrand(state.brandId)} go={go} />
               : <StaffCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} />)}
         </main>
+        {modal ? <MockupModal type={modal} onClose={() => setModal(null)} /> : null}
       </div>
     </div>
   )
@@ -405,7 +444,7 @@ function BrandSelectTab({ campaign, selectedCandidateIds, setSelectedCandidateId
                 return (
                   <tr key={item.id}>
                     <td><input checked={checked} disabled={!checked && checkedCount >= campaign.brandQuota} onChange={() => toggleCandidate(item.id)} type="checkbox" /></td>
-                    <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                    <td><div className="cell-name">{item.name}</div><ChannelPills item={item} /></td>
                     <td><TierBadge tier={item.tier} /></td>
                     <td className="followers">{item.followers}</td>
                     <td><StatusBadge status={item.status} /></td>
@@ -426,27 +465,33 @@ function BrandProgressTab({ campaign }) {
   return <InfluencerProgressTable rows={rows} />
 }
 
-function OwnerDashboard({ allCampaigns, go }) {
+function OwnerDashboard({ allCampaigns, go, openModal }) {
   const sumTarget = allCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
   const sumConfirmed = allCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
-  const pendingReview = allCampaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner').length, 0)
+  const pendingReview = allCampaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved').length, 0)
 
   return (
     <>
-      <h1 className="page-title">ภาพรวมทั้งหมด</h1>
-      <p className="page-sub">สรุปทุกแบรนด์และแคมเปญที่กำลังดำเนินการ</p>
-      <div className="grid cols-4 block-gap">
+      <div className="flex-between owner-head">
+        <div>
+          <h1 className="page-title">ภาพรวมทั้งหมด</h1>
+          <p className="page-sub no-margin">สรุปทุกแบรนด์และแคมเปญที่กำลังดำเนินการ</p>
+        </div>
+        <button className="btn primary" onClick={() => openModal('brand')} type="button">+ เพิ่มแบรนด์ใหม่</button>
+      </div>
+      <div className="grid cols-4 block-gap owner-stats">
         <Stat label="แบรนด์ที่ดูแล" value={DB.brands.length} />
         <Stat label="แคมเปญทั้งหมด" value={allCampaigns.length} />
         <Stat label="อินฟลูยืนยันแล้ว / เป้า" value={sumConfirmed} sub={`/ ${sumTarget}`} />
-        <Stat label="รอตรวจจากทีม" value={pendingReview} tone="warning" />
+        <Stat label="รอหัวหน้าตรวจ" value={pendingReview} tone="warning" />
       </div>
+      <SeniorReviewerPanel openModal={openModal} />
       <div className="section-title">รายชื่อแบรนด์</div>
       <div className="grid cols-2">
         {DB.brands.map((brand) => {
           const target = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
           const selected = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
-          const pending = brand.campaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner').length, 0)
+          const pending = brand.campaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved').length, 0)
           return (
             <CampaignCard
               campaign={{ ...brand, meta: `${brand.campaigns.length} แคมเปญ` }}
@@ -458,8 +503,32 @@ function OwnerDashboard({ allCampaigns, go }) {
             </CampaignCard>
           )
         })}
+        <button className="add-brand-card" onClick={() => openModal('brand')} type="button"><span>+</span> เพิ่มแบรนด์ใหม่</button>
       </div>
     </>
+  )
+}
+
+function SeniorReviewerPanel({ openModal }) {
+  return (
+    <div className="card block-gap">
+      <div className="flex-between table-heading">
+        <div className="section-title no-margin">Senior Reviewer <span className="hint">ได้รับสิทธิ์ช่วยคัดเลือกก่อนถึงหัวหน้า</span></div>
+        <button className="btn secondary sm" onClick={() => openModal('senior')} type="button">จัดการสิทธิ์</button>
+      </div>
+      <div className="senior-list">
+        {DB.seniors.map((senior) => (
+          <div className="senior-card" key={senior.id}>
+            <div className="senior-avatar">{senior.name.slice(-1)}</div>
+            <div>
+              <div className="cell-name">{senior.name}</div>
+              <div className="cell-sub">{senior.role}</div>
+            </div>
+            <Badge cls="purple">✓ มีสิทธิ์คัด</Badge>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -495,21 +564,22 @@ function OwnerBrand({ brand, go }) {
   )
 }
 
-function OwnerCampaign({ brand, campaign, state, go }) {
+function OwnerCampaign({ brand, campaign, state, go, openModal }) {
   return (
     <>
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">{brand.name} · {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}</p>
       <Tabs tabs={[['review', 'ตรวจรายชื่อจากทีม'], ['setup', 'บรีฟ & เป้าหมาย'], ['prod', 'ภาพรวมการผลิตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
-      {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} /> : <OwnerProductionTab campaign={campaign} />}
+      {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} openModal={openModal} /> : <OwnerProductionTab campaign={campaign} />}
     </>
   )
 }
 
 function OwnerReviewTab({ campaign }) {
-  const pending = campaign.influencers.filter((item) => item.status === 'pending_owner')
+  const pending = campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved')
   const approvedWaitingBrand = campaign.influencers.filter((item) => item.status === 'owner_approved')
   const selectedByBrand = campaign.influencers.filter((item) => item.status === 'brand_selected')
+  const seniorApprovedCount = pending.filter((item) => item.status === 'senior_approved').length
 
   return (
     <>
@@ -519,14 +589,15 @@ function OwnerReviewTab({ campaign }) {
         <Stat label="ส่งให้แบรนด์แล้ว" value={totalTier(campaign, 'ownerApproved')} />
         <Stat label="แบรนด์ยืนยันแล้ว" value={totalTier(campaign, 'brandSelected')} sub={`/ ${campaign.brandQuota}`} />
       </div>
-      <ReviewCard rows={pending} title="รายชื่อใหม่จากทีม — รอการตรวจสอบ" actionLabel={pending.length ? 'ส่งที่อนุมัติให้แบรนด์' : ''} />
+      <OwnerAddInfluencerForm />
+      <ReviewCard rows={pending} title={<>รายชื่อรอตรวจ ({pending.length}) {seniorApprovedCount ? <span className="senior-chip title-chip">✓ Senior อนุมัติแล้ว {seniorApprovedCount} คน</span> : null}</>} actionLabel={pending.length ? 'ส่งที่อนุมัติให้แบรนด์' : ''} showSenior />
       <SimpleInfluencerCard rows={approvedWaitingBrand} title={`ส่งให้แบรนด์แล้ว — รอแบรนด์เลือก (${approvedWaitingBrand.length})`} />
-      <SimpleInfluencerCard rows={selectedByBrand} title={`แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})`} actionLabel={selectedByBrand.length ? 'ยืนยัน & แจ้งทีม' : ''} />
+      <SimpleInfluencerCard rows={selectedByBrand} title={`แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})`} actionLabel={selectedByBrand.length ? 'ยืนยัน & แจ้งทีม' : ''} showBank />
     </>
   )
 }
 
-function OwnerSetupTab({ campaign }) {
+function OwnerSetupTab({ campaign, openModal }) {
   return (
     <>
       <div className="grid cols-2">
@@ -547,6 +618,8 @@ function OwnerSetupTab({ campaign }) {
           <div className="section-title">เป้าหมาย & โควต้าการคัดเลือก</div>
           <Field label="จำนวนอินฟลูที่ต้องการทั้งหมด" type="number" value={campaign.target} />
           <Field label="โควต้าที่แบรนด์เลือกได้สูงสุด" type="number" value={campaign.brandQuota} />
+          <Field label="วันเริ่มลงคลิป" type="date" />
+          <Field label="วันครบกำหนด" type="date" />
           <button className="btn primary" onClick={() => alert('บันทึกการตั้งค่าแล้ว')} type="button">บันทึก</button>
         </div>
       </div>
@@ -555,6 +628,25 @@ function OwnerSetupTab({ campaign }) {
         <div className="grid cols-5">
           {TIERS.map((tier) => <Field key={tier} label={tier} type="number" value={campaign.tierStats[tier].target} />)}
         </div>
+      </div>
+      <div className="card target-card">
+        <div className="section-title">Senior Reviewer <span className="hint">ให้สิทธิ์ช่วยคัดรายชื่อก่อนถึงหัวหน้า</span></div>
+        {DB.seniors.map((senior) => (
+          <div className="senior-permission-row" key={senior.id}>
+            <div className="senior-person">
+              <div className="senior-avatar small">{senior.name.slice(-1)}</div>
+              <div>
+                <div className="cell-name">{senior.name}</div>
+                <div className="cell-sub">{senior.role}</div>
+              </div>
+            </div>
+            <div className="permission-actions">
+              <Badge cls="purple">✓ มีสิทธิ์อยู่</Badge>
+              <button className="btn sm danger-btn" onClick={() => alert('ถอนสิทธิ์')} type="button">ถอนสิทธิ์</button>
+            </div>
+          </div>
+        ))}
+        <button className="btn secondary form-action" onClick={() => openModal('senior')} type="button">+ เพิ่ม Senior Reviewer</button>
       </div>
     </>
   )
@@ -651,13 +743,15 @@ function StaffSourceTab({ campaign }) {
       </div>
       <div className="card block-gap">
         <div className="section-title">เพิ่มอินฟลูเอนเซอร์ใหม่</div>
-        <div className="dup-banner">ระบบจะแจ้งเตือนหากลิงก์ช่องทางนี้มีคนในทีมเพิ่มไว้แล้ว เพื่อป้องกันการคัดซ้ำ</div>
-        <div className="grid cols-4">
+        <div className="dup-banner">ระบบจะแจ้งเตือนหากช่องทางนี้มีคนในทีมเพิ่มไว้แล้ว เพื่อป้องกันการคัดซ้ำ</div>
+        <div className="grid cols-4 block-gap">
           <Field label="ชื่ออินฟลูเอนเซอร์" placeholder="เช่น Beauty by Ploy" />
-          <Field label="ลิงก์ช่องทาง" placeholder="วางลิงก์ IG / TikTok / YouTube" />
           <Field label="ระดับ" options={TIERS} />
+          <Field label="ผู้ติดตาม (ผลรวมทุกช่อง)" placeholder="เช่น 45K" />
           <Field label="วันที่ดีลงานสำเร็จ" type="date" />
         </div>
+        <ChannelFields />
+        <BankFields />
         <button className="btn primary form-action" onClick={() => alert('เพิ่มรายชื่อแล้ว — สถานะ: รอหัวหน้าตรวจ')} type="button">+ เพิ่มรายชื่อ</button>
       </div>
       <div className="card">
@@ -705,6 +799,46 @@ function ProgressMetric({ label, value, max, color = '#4C5FD5' }) {
   )
 }
 
+function ChannelFields() {
+  return (
+    <>
+      <div className="section-title mini-title">ช่องทางลงคลิป <span className="hint">ใส่อย่างน้อย 1 ช่องทาง</span></div>
+      <div className="grid cols-3 block-gap">
+        {CHANNELS.map((channel) => <Field key={channel} label={CH_LABEL[channel] || channel} placeholder={`วางลิงก์ ${CH_LABEL[channel] || channel}`} />)}
+      </div>
+    </>
+  )
+}
+
+function BankFields() {
+  return (
+    <>
+      <div className="section-title mini-title">ข้อมูลธนาคารสำหรับจ่ายเงิน <span className="hint">ใส่ตอนดีลเสร็จได้เลย</span></div>
+      <div className="grid cols-3 block-gap">
+        <Field label="ธนาคาร" options={['-- เลือกธนาคาร --', ...THAI_BANKS]} />
+        <Field label="เลขบัญชี / Promptpay" placeholder="0123456789" />
+        <Field label="ชื่อเจ้าของบัญชี" placeholder="ตามหน้าบัตรประชาชน" />
+      </div>
+    </>
+  )
+}
+
+function OwnerAddInfluencerForm() {
+  return (
+    <div className="card block-gap">
+      <div className="section-title">เพิ่มอินฟลูเอนเซอร์โดยหัวหน้า <span className="hint">ข้ามขั้นตอนทีม → เข้าสู่สถานะ owner_approved ทันที</span></div>
+      <div className="grid cols-4 block-gap">
+        <Field label="ชื่ออินฟลูเอนเซอร์" placeholder="เช่น Mega Star KOL" />
+        <Field label="ระดับ" options={TIERS} />
+        <Field label="ผู้ติดตาม" placeholder="เช่น 2.3M" />
+        <Field label="วันที่ดีลงานสำเร็จ" type="date" />
+      </div>
+      <ChannelFields />
+      <button className="btn primary" onClick={() => alert('เพิ่มรายชื่อโดยหัวหน้า → owner_approved ทันที')} type="button">+ เพิ่มรายชื่อ (หัวหน้า)</button>
+    </div>
+  )
+}
+
 function TierSummaryTable({ campaign }) {
   return (
     <div className="card block-gap">
@@ -732,7 +866,7 @@ function TierSummaryTable({ campaign }) {
   )
 }
 
-function ReviewCard({ rows, title, actionLabel }) {
+function ReviewCard({ rows, title, actionLabel, showSenior = false }) {
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
@@ -743,14 +877,14 @@ function ReviewCard({ rows, title, actionLabel }) {
         <div className="table-wrap">
           <table>
             <tbody>
-              <tr><th></th><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th>การตัดสิน</th></tr>
+              <tr><th>ชื่อ / ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th>{showSenior ? <th>Senior</th> : null}<th>การตัดสิน</th></tr>
               {rows.map((item) => (
                 <tr key={item.id}>
-                  <td></td>
-                  <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                  <td><div className="cell-name">{item.name}</div><ChannelPills item={item} /></td>
                   <td><TierBadge tier={item.tier} /></td>
                   <td className="followers">{item.followers}</td>
                   <td>{item.addedBy}</td>
+                  {showSenior ? <td><SeniorChip approval={item.seniorApproval} /></td> : null}
                   <td className="button-cell">
                     <button className="btn sm primary" onClick={() => alert('คัดผ่าน → ส่งให้แบรนด์')} type="button">คัดผ่าน</button>
                     <button className="btn sm secondary" onClick={() => alert('คัดออก')} type="button">คัดออก</button>
@@ -765,33 +899,46 @@ function ReviewCard({ rows, title, actionLabel }) {
   )
 }
 
-function SimpleInfluencerCard({ rows, title, actionLabel }) {
+function SimpleInfluencerCard({ rows, title, actionLabel, showBank = false }) {
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
         <div className="section-title no-margin">{title}</div>
         {actionLabel ? <button className="btn primary" onClick={() => alert('ยืนยันรายชื่อสุดท้าย และแจ้งทีมให้เริ่มงาน + ส่งสินค้า')} type="button">{actionLabel}</button> : null}
       </div>
-      <InfluencerListTable rows={rows} />
+      <InfluencerListTable rows={rows} showBank={showBank} />
     </div>
   )
 }
 
-function InfluencerListTable({ rows, staffMode = false }) {
+function InfluencerListTable({ rows, staffMode = false, showBank = false }) {
   return (
     <div className="table-wrap">
       <table>
         <tbody>
-          <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th>{staffMode ? 'วันดีลงาน' : 'สถานะ'}</th>{staffMode ? <th>สถานะ</th> : null}</tr>
+          <tr>
+            <th>ชื่อ / ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th>
+            {staffMode ? <th>วันดีลงาน</th> : null}
+            {(staffMode || showBank) ? <th>ธนาคาร</th> : null}
+            {staffMode ? <th>Senior</th> : null}
+            <th>สถานะ</th>
+          </tr>
           {rows.map((item) => {
             const isMine = item.addedBy === CURRENT_STAFF
             return (
               <tr className={staffMode && !isMine ? 'row-muted' : ''} key={item.id}>
-                <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                <td>
+                  <div className="cell-name">
+                    {item.name} {item.addedByRole === 'owner' ? <Badge cls="purple">หัวหน้าเพิ่ม</Badge> : null}
+                  </div>
+                  <ChannelPills item={item} />
+                </td>
                 <td><TierBadge tier={item.tier} /></td>
                 <td className="followers">{item.followers}</td>
                 <td>{item.addedBy}{staffMode && isMine ? <span className="cell-sub"> (ของฉัน)</span> : null}</td>
                 {staffMode ? <td>{item.dealDate}</td> : null}
+                {(staffMode || showBank) ? <td><BankChip bank={item.bank} /></td> : null}
+                {staffMode ? <td><SeniorChip approval={item.seniorApproval} /></td> : null}
                 <td><StatusBadge status={item.status} /></td>
               </tr>
             )
@@ -809,16 +956,21 @@ function InfluencerProgressTable({ rows, title = 'รายชื่อที่
       <div className="table-wrap">
         <table>
           <tbody>
-            <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th>{withOwner ? <th>ผู้ดูแล</th> : null}<th>วันดีลงาน</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th></tr>
+            <tr>
+              <th>ชื่อ / ช่องทาง</th><th>ระดับ</th>{withOwner ? <th>ผู้ดูแล</th> : null}<th>วันดีลงาน</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th>
+              {withOwner ? <><th>Asset</th><th>ธนาคาร</th></> : null}
+            </tr>
             {rows.map((item) => (
               <tr key={item.id}>
-                <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                <td><div className="cell-name">{item.name}</div><ChannelPills item={item} /></td>
                 <td><TierBadge tier={item.tier} /></td>
                 {withOwner ? <td>{item.addedBy}</td> : null}
                 <td>{item.dealDate}</td>
                 <td><DraftBadge draft={item.draft} /></td>
                 <td>{item.postDate}</td>
-                <td>{item.postLink ? <a className="link" href="#">{item.postLink}</a> : <span className="muted-text">—</span>}</td>
+                <td>{item.postLink ? <a className="link" href="#">ดูคลิป</a> : <span className="muted-text">—</span>}</td>
+                {withOwner ? <td>{item.assetLink ? <a className="link" href="#">ไฟล์</a> : <span className="muted-text">—</span>}</td> : null}
+                {withOwner ? <td><BankChip bank={item.bank} /></td> : null}
               </tr>
             ))}
           </tbody>
@@ -833,10 +985,10 @@ function EditableTrackTable({ rows }) {
     <div className="table-wrap">
       <table>
         <tbody>
-          <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>วันดีลงาน</th><th>ส่งสินค้าแล้ว</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th></tr>
+          <tr><th>ชื่อ / ช่องทาง</th><th>ระดับ</th><th>วันดีลงาน</th><th>ส่งสินค้า</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th><th>Asset ไฟล์</th><th>ธนาคาร</th></tr>
           {rows.map((item) => (
             <tr key={item.id}>
-              <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+              <td><div className="cell-name">{item.name}</div><ChannelPills item={item} /></td>
               <td><TierBadge tier={item.tier} /></td>
               <td>{item.dealDate}</td>
               <td><input defaultChecked={item.draft !== 'waiting'} type="checkbox" /></td>
@@ -846,7 +998,9 @@ function EditableTrackTable({ rows }) {
                 </select>
               </td>
               <td><input className="compact-input" defaultValue={item.draft === 'posted' ? '2026-07-05' : ''} type="date" /></td>
-              <td><input className="link-input" defaultValue={item.postLink} placeholder="วางลิงก์คลิปที่นี่" type="text" /></td>
+              <td><input className="link-input small" defaultValue={item.postLink} placeholder="ลิงก์คลิป" type="text" /></td>
+              <td><input className="link-input" defaultValue={item.assetLink} placeholder="ลิงก์ Asset (Drive/Dropbox)" type="text" /></td>
+              <td>{item.bank ? <BankChip bank={item.bank} /> : <button className="btn xs secondary" onClick={() => alert('เปิดฟอร์มใส่ข้อมูลธนาคาร')} type="button">+ ใส่ธนาคาร</button>}</td>
             </tr>
           ))}
         </tbody>
@@ -862,6 +1016,40 @@ function Field({ label, options, type = 'text', value, placeholder }) {
       {options
         ? <select defaultValue={options[0]}>{options.map((option) => <option key={option}>{option}</option>)}</select>
         : <input defaultValue={value} placeholder={placeholder} type={type} />}
+    </div>
+  )
+}
+
+function MockupModal({ type, onClose }) {
+  const isBrand = type === 'brand'
+  return (
+    <div className="modal-overlay" onClick={onClose} role="presentation">
+      <div className="modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+        <h2>{isBrand ? 'เพิ่มแบรนด์ใหม่' : 'เพิ่ม Senior Reviewer'}</h2>
+        <div className="modal-sub">{isBrand ? 'กรอกข้อมูลแบรนด์เพื่อเริ่มสร้างแคมเปญ' : 'Senior จะสามารถช่วยตรวจรายชื่ออินฟลูก่อนส่งถึงหัวหน้า'}</div>
+        {isBrand ? (
+          <>
+            <div className="grid cols-2">
+              <Field label="ชื่อแบรนด์" placeholder="เช่น SkinGlow Beauty" />
+              <Field label="ผู้ติดต่อ (Brand Manager)" placeholder="ชื่อผู้ติดต่อหลัก" />
+              <Field label="อีเมล" placeholder="contact@brand.com" type="email" />
+              <Field label="เบอร์โทร" placeholder="08x-xxx-xxxx" type="tel" />
+            </div>
+            <div className="modal-field"><Field label="หมายเหตุ / รายละเอียดเพิ่มเติม" placeholder="เช่น ประเภทสินค้า, กลุ่มเป้าหมาย" /></div>
+          </>
+        ) : (
+          <div className="grid cols-2">
+            <Field label="ชื่อพนักงาน" placeholder="ชื่อ-นามสกุล" />
+            <Field label="ตำแหน่ง" placeholder="เช่น Senior Coordinator" />
+            <Field label="อีเมล" placeholder="staff@agency.com" type="email" />
+            <Field label="ระดับสิทธิ์" options={['ตรวจรายชื่อ + Approve เบื้องต้น', 'ตรวจรายชื่อเท่านั้น (ไม่ Approve)']} />
+          </div>
+        )}
+        <div className="modal-actions">
+          <button className="btn secondary" onClick={onClose} type="button">ยกเลิก</button>
+          <button className="btn primary" onClick={() => { alert(isBrand ? 'สร้างแบรนด์ใหม่แล้ว' : 'เพิ่ม Senior Reviewer แล้ว'); onClose() }} type="button">{isBrand ? 'สร้างแบรนด์' : 'บันทึก'}</button>
+        </div>
+      </div>
     </div>
   )
 }
