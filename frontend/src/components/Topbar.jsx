@@ -7,7 +7,7 @@ function getPageKey(pathname) {
   return basePath
 }
 
-function Topbar() {
+function Topbar({ onToggleSidebar }) {
   const location = useLocation()
   const role = localStorage.getItem('agencyhub-role') || 'Owner'
   const { language, t, toggleLanguage } = useLanguage()
@@ -16,6 +16,14 @@ function Topbar() {
 
   return (
     <header className="topbar">
+      <button
+        className="mobile-menu-button"
+        type="button"
+        onClick={onToggleSidebar}
+        aria-label="Toggle menu"
+      >
+        ☰
+      </button>
       <div>
         <p className="breadcrumb">AgencyHub / {role} / {title}</p>
         <h1>{title}</h1>

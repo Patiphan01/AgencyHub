@@ -33,6 +33,34 @@ button {
   cursor: pointer;
 }
 
+.sidebar-backdrop {
+  display: none;
+}
+
+.mobile-menu-button {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #d9deeb;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #4c5fd5;
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.sidebar-close {
+  display: none;
+  margin-bottom: 18px;
+  border: 0;
+  background: transparent;
+  color: #475467;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .login-screen {
   display: grid;
   min-height: 100vh;
@@ -885,11 +913,49 @@ button {
   }
 }
 
-@media (max-width: 640px) {
-  .page-content,
-  .topbar,
+@media (max-width: 840px) {
   .sidebar {
-    padding: 18px;
+    position: fixed;
+    inset: 0 0 auto 0;
+    width: min(280px, 80vw);
+    max-width: 320px;
+    height: 100vh;
+    transform: translateX(-110%);
+    transition: transform 180ms ease;
+    z-index: 30;
+    box-shadow: 18px 0 48px rgba(23, 32, 51, 0.12);
+    padding: 26px 20px;
+    overflow-y: auto;
+    background: #ffffff;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: rgba(23, 32, 51, 0.36);
+  }
+
+  .sidebar-backdrop.visible {
+    display: block;
+  }
+
+  .sidebar-close {
+    display: inline-flex;
+  }
+
+  .mobile-menu-button {
+    display: inline-flex;
+  }
+
+  .topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .topbar,
@@ -899,8 +965,86 @@ button {
     flex-direction: column;
   }
 
+  .page-content,
+  .topbar,
+  .sidebar {
+    padding: 18px;
+  }
+
   .nav-links,
   .role-picker {
     grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    gap: 12px;
+  }
+
+  .topbar h1 {
+    font-size: 1.35rem;
+  }
+
+  .breadcrumb {
+    max-width: 100%;
+  }
+
+  .notification-panel {
+    right: 0;
+    left: auto;
+    min-width: 260px;
+  }
+
+  .page-content {
+    padding: 18px 16px;
+  }
+
+  .data-table {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-content,
+  .topbar,
+  .sidebar {
+    padding: 16px;
+  }
+
+  .topbar {
+    min-height: auto;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+
+  .mobile-menu-button {
+    display: inline-flex;
+  }
+
+  .topbar h1 {
+    font-size: 1.2rem;
+  }
+
+  .notification-center,
+  .language-toggle,
+  .topbar-user {
+    flex: 1;
+  }
+
+  .notification-panel {
+    width: calc(100vw - 32px);
+    right: 0;
+    left: 0;
+    margin: 0 auto;
+  }
+
+  .sidebar {
+    width: 100%;
+    max-width: 100%;
   }
 }

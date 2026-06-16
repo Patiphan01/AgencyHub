@@ -30,20 +30,30 @@ const navigationByRole = {
   ],
 }
 
-function Sidebar() {
+function Sidebar({ isOpen, onClose }) {
   const role = localStorage.getItem('agencyhub-role') || 'Owner'
   const links = navigationByRole[role] || navigationByRole.Owner
   const navigate = useNavigate()
   const { t } = useLanguage()
 
+  const handleNavClick = () => {
+    onClose?.()
+  }
+
   function handleLogout() {
     localStorage.removeItem('agencyhub-role')
+    onClose?.()
     navigate('/login')
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? ' open' : ''}`}>
       <div>
+        {isOpen && (
+          <button className="sidebar-close" onClick={onClose} type="button" aria-label="Close menu">
+            ✕
+          </button>
+        )}
         <div className="brand-block">
           <div className="logo-mark">A</div>
           <div>
@@ -58,6 +68,7 @@ function Sidebar() {
               className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
               key={link.to}
               to={link.to}
+              onClick={handleNavClick}
             >
               {t.nav[link.labelKey]}
             </NavLink>
