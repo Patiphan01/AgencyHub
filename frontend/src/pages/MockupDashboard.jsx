@@ -1,0 +1,869 @@
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+const TIERS = ['Nano', 'Micro', 'Mid', 'Macro', 'Mega']
+const TIER_COLOR = {
+  Nano: '#0EA5A6',
+  Micro: '#3B82F6',
+  Mid: '#F59E0B',
+  Macro: '#EF4444',
+  Mega: '#8B5CF6',
+}
+
+const STATUS_MAP = {
+  pending_owner: { label: 'รอหัวหน้าตรวจ', cls: 'warning' },
+  owner_approved: { label: 'หัวหน้าคัดผ่าน · รอแบรนด์เลือก', cls: 'primary' },
+  owner_rejected: { label: 'หัวหน้าคัดออก', cls: 'muted' },
+  brand_selected: { label: 'แบรนด์เลือกแล้ว', cls: 'success' },
+  brand_rejected: { label: 'แบรนด์ไม่เลือก', cls: 'muted' },
+  confirmed: { label: 'ยืนยันแล้ว · กำลังผลิตคอนเทนต์', cls: 'success' },
+}
+
+const DRAFT_MAP = {
+  waiting: { label: 'รอส่งดราฟ', cls: 'muted' },
+  review: { label: 'ส่งดราฟแล้ว · รอตรวจ', cls: 'warning' },
+  revise: { label: 'ขอแก้ไขดราฟ', cls: 'danger' },
+  approved: { label: 'ดราฟผ่านแล้ว', cls: 'primary' },
+  posted: { label: 'ลงคลิปแล้ว', cls: 'success' },
+}
+
+const CURRENT_STAFF = 'แนน'
+
+function makeStats(t) {
+  return {
+    target: t.target,
+    sourced: t.sourced,
+    ownerApproved: t.oa,
+    brandSelected: t.bs,
+    confirmed: t.bs,
+    posted: t.posted,
+  }
+}
+
+const DB = {
+  brands: [
+    {
+      id: 'b1',
+      name: 'GlowSkin Cosmetics',
+      initials: 'GS',
+      campaigns: [
+        {
+          id: 'c1',
+          name: 'Hydra Glow Serum — Launch Campaign',
+          status: 'กำลังคัดเลือกอินฟลู',
+          startDate: '1 ก.ค. 2569',
+          deadlineDate: '20 ก.ค. 2569',
+          target: 300,
+          brandQuota: 300,
+          briefFile: 'GlowSkin_HydraGlow_Brief_v2.pdf',
+          briefVersion: 'v2',
+          briefDate: '10 มิ.ย. 2569',
+          tierStats: {
+            Nano: makeStats({ target: 120, sourced: 135, oa: 125, bs: 115, posted: 58 }),
+            Micro: makeStats({ target: 100, sourced: 92, oa: 88, bs: 85, posted: 48 }),
+            Mid: makeStats({ target: 50, sourced: 47, oa: 44, bs: 43, posted: 19 }),
+            Macro: makeStats({ target: 25, sourced: 21, oa: 19, bs: 18, posted: 7 }),
+            Mega: makeStats({ target: 5, sourced: 4, oa: 3, bs: 3, posted: 1 }),
+          },
+          influencers: [
+            { id: 1, name: 'Mai Cosmetic Diary', channel: 'instagram.com/maicosmeticdiary', tier: 'Nano', followers: '8.4K', addedBy: 'แนน', dealDate: '20 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '5 ก.ค. 2569', postLink: 'instagram.com/p/abc123' },
+            { id: 2, name: 'Beauty by Ploy', channel: 'tiktok.com/@beautybyploy', tier: 'Micro', followers: '32K', addedBy: 'แนน', dealDate: '22 มิ.ย. 2569', status: 'confirmed', draft: 'approved', postDate: '-', postLink: '' },
+            { id: 3, name: 'SkinCareGuy', channel: 'youtube.com/skincareguy', tier: 'Nano', followers: '6.1K', addedBy: 'ต้น', dealDate: '21 มิ.ย. 2569', status: 'confirmed', draft: 'revise', postDate: '-', postLink: '' },
+            { id: 4, name: 'Fah Beauty Talk', channel: 'instagram.com/fahbeautytalk', tier: 'Mid', followers: '88K', addedBy: 'ต้น', dealDate: '23 มิ.ย. 2569', status: 'confirmed', draft: 'review', postDate: '-', postLink: '' },
+            { id: 5, name: 'Glow with Gam', channel: 'tiktok.com/@glowwithgam', tier: 'Macro', followers: '420K', addedBy: 'แนน', dealDate: '25 มิ.ย. 2569', status: 'confirmed', draft: 'waiting', postDate: '-', postLink: '' },
+            { id: 6, name: 'The Skin Diary', channel: 'instagram.com/theskindiary', tier: 'Micro', followers: '45K', addedBy: 'บีม', dealDate: '-', status: 'brand_selected', draft: '', postDate: '', postLink: '' },
+            { id: 7, name: 'Nicha Reviews', channel: 'tiktok.com/@nichareviews', tier: 'Nano', followers: '4.2K', addedBy: 'บีม', dealDate: '-', status: 'owner_approved', draft: '', postDate: '', postLink: '' },
+            { id: 8, name: 'Cosmetic King', channel: 'youtube.com/cosmeticking', tier: 'Mega', followers: '1.4M', addedBy: 'ต้น', dealDate: '-', status: 'owner_approved', draft: '', postDate: '', postLink: '' },
+            { id: 9, name: 'Sweet Skin Sara', channel: 'instagram.com/sweetskinsara', tier: 'Micro', followers: '28K', addedBy: 'แนน', dealDate: '-', status: 'pending_owner', draft: '', postDate: '', postLink: '' },
+            { id: 10, name: 'Daily Glow TH', channel: 'tiktok.com/@dailyglowth', tier: 'Nano', followers: '9.8K', addedBy: 'บีม', dealDate: '-', status: 'owner_rejected', draft: '', postDate: '', postLink: '' },
+          ],
+        },
+        {
+          id: 'c2',
+          name: 'Sunscreen SPF50 — Always-on Campaign',
+          status: 'กำลังผลิตคอนเทนต์',
+          startDate: '15 พ.ค. 2569',
+          deadlineDate: '30 มิ.ย. 2569',
+          target: 150,
+          brandQuota: 150,
+          briefFile: 'GlowSkin_SPF50_Brief_v1.pdf',
+          briefVersion: 'v1',
+          briefDate: '2 พ.ค. 2569',
+          tierStats: {
+            Nano: makeStats({ target: 60, sourced: 60, oa: 58, bs: 55, posted: 55 }),
+            Micro: makeStats({ target: 50, sourced: 50, oa: 48, bs: 47, posted: 45 }),
+            Mid: makeStats({ target: 30, sourced: 29, oa: 28, bs: 27, posted: 20 }),
+            Macro: makeStats({ target: 8, sourced: 8, oa: 7, bs: 7, posted: 5 }),
+            Mega: makeStats({ target: 2, sourced: 2, oa: 2, bs: 2, posted: 1 }),
+          },
+          influencers: [
+            { id: 11, name: 'Aom Sunny Day', channel: 'instagram.com/aomsunnyday', tier: 'Micro', followers: '38K', addedBy: 'แนน', dealDate: '5 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '18 มิ.ย. 2569', postLink: 'instagram.com/p/sun001' },
+            { id: 12, name: 'UV Defense TH', channel: 'tiktok.com/@uvdefenseth', tier: 'Nano', followers: '7.7K', addedBy: 'ต้น', dealDate: '4 มิ.ย. 2569', status: 'confirmed', draft: 'posted', postDate: '17 มิ.ย. 2569', postLink: 'tiktok.com/@uvdefenseth/video/9981' },
+            { id: 13, name: 'Beach Skin Bun', channel: 'instagram.com/beachskinbun', tier: 'Mid', followers: '120K', addedBy: 'บีม', dealDate: '6 มิ.ย. 2569', status: 'confirmed', draft: 'revise', postDate: '-', postLink: '' },
+            { id: 14, name: 'Plern Beauty Lab', channel: 'youtube.com/plernbeautylab', tier: 'Macro', followers: '310K', addedBy: 'ต้น', dealDate: '7 มิ.ย. 2569', status: 'confirmed', draft: 'review', postDate: '-', postLink: '' },
+            { id: 15, name: 'Cherry Sunscreen Diary', channel: 'tiktok.com/@cherrysunscreen', tier: 'Micro', followers: '21K', addedBy: 'แนน', dealDate: '8 มิ.ย. 2569', status: 'confirmed', draft: 'approved', postDate: '-', postLink: '' },
+            { id: 16, name: 'SkinFirst Nat', channel: 'instagram.com/skinfirstnat', tier: 'Nano', followers: '5.5K', addedBy: 'บีม', dealDate: '9 มิ.ย. 2569', status: 'confirmed', draft: 'waiting', postDate: '-', postLink: '' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'b2',
+      name: 'FitFuel Protein',
+      initials: 'FF',
+      campaigns: [
+        {
+          id: 'c3',
+          name: 'Whey Protein — New Flavor Launch',
+          status: 'รอบรีฟจากหัวหน้า',
+          startDate: '-',
+          deadlineDate: '-',
+          target: 80,
+          brandQuota: 80,
+          briefFile: null,
+          briefVersion: null,
+          briefDate: null,
+          tierStats: {
+            Nano: makeStats({ target: 30, sourced: 0, oa: 0, bs: 0, posted: 0 }),
+            Micro: makeStats({ target: 30, sourced: 0, oa: 0, bs: 0, posted: 0 }),
+            Mid: makeStats({ target: 15, sourced: 0, oa: 0, bs: 0, posted: 0 }),
+            Macro: makeStats({ target: 5, sourced: 0, oa: 0, bs: 0, posted: 0 }),
+            Mega: makeStats({ target: 0, sourced: 0, oa: 0, bs: 0, posted: 0 }),
+          },
+          influencers: [],
+        },
+      ],
+    },
+  ],
+}
+
+function totalTier(campaign, key) {
+  return TIERS.reduce((sum, tier) => sum + campaign.tierStats[tier][key], 0)
+}
+
+function Badge({ children, cls = 'muted' }) {
+  return <span className={`badge ${cls}`}>{children}</span>
+}
+
+function TierBadge({ tier }) {
+  return (
+    <span className="badge muted" style={{ background: `${TIER_COLOR[tier]}1A`, color: TIER_COLOR[tier] }}>
+      <span className="tier-dot" style={{ background: TIER_COLOR[tier] }} />
+      {tier}
+    </span>
+  )
+}
+
+function ProgressBar({ value, max, color = '#4C5FD5' }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
+  return <div className="pbar"><div style={{ width: `${pct}%`, background: color }} /></div>
+}
+
+function Stat({ label, value, sub, tone }) {
+  return (
+    <div className="stat">
+      <div className="label">{label}</div>
+      <div className="value" style={tone ? { color: `var(--${tone})` } : undefined}>
+        {value} {sub ? <small>{sub}</small> : null}
+      </div>
+    </div>
+  )
+}
+
+function StatusBadge({ status }) {
+  const statusData = STATUS_MAP[status]
+  return statusData ? <Badge cls={statusData.cls}>{statusData.label}</Badge> : null
+}
+
+function DraftBadge({ draft }) {
+  const draftData = DRAFT_MAP[draft]
+  return draftData ? <Badge cls={draftData.cls}>{draftData.label}</Badge> : <span className="muted-text">—</span>
+}
+
+function EmptyState({ icon, title, desc }) {
+  return (
+    <div className="card">
+      <div className="empty">
+        <div className="icon">{icon}</div>
+        <div className="title">{title}</div>
+        <div>{desc}</div>
+      </div>
+    </div>
+  )
+}
+
+function CampaignCard({ campaign, children, badge, onClick }) {
+  return (
+    <button className="camp-card" onClick={onClick} type="button">
+      <div className="top">
+        <div>
+          <h3>{campaign.name}</h3>
+          <div className="meta">{campaign.meta}</div>
+        </div>
+        {badge}
+      </div>
+      {children}
+    </button>
+  )
+}
+
+function getInitialRole() {
+  const storedRole = localStorage.getItem('agencyhub-role')
+  const roleMap = {
+    Brand: 'brand',
+    Owner: 'owner',
+    Staff: 'staff',
+    brand: 'brand',
+    owner: 'owner',
+    staff: 'staff',
+  }
+  return roleMap[storedRole] || 'brand'
+}
+
+function MockupDashboard() {
+  const navigate = useNavigate()
+  const [state, setState] = useState(() => {
+    const role = getInitialRole()
+    return { role, view: 'dashboard', brandId: null, campaignId: null, tab: role === 'owner' ? 'review' : 'source' }
+  })
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState(() => new Set())
+  const allCampaigns = useMemo(() => DB.brands.flatMap((brand) => brand.campaigns.map((campaign) => ({ ...campaign, brandName: brand.name, brandId: brand.id }))), [])
+
+  function go(next) {
+    setState((current) => ({ ...current, ...next }))
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
+  }
+
+  function logout() {
+    localStorage.removeItem('agencyhub-role')
+    navigate('/login')
+  }
+
+  function getBrand(id) {
+    return DB.brands.find((brand) => brand.id === id)
+  }
+
+  function getCampaign(brandId, campaignId) {
+    return getBrand(brandId)?.campaigns.find((campaign) => campaign.id === campaignId)
+  }
+
+  const crumbs = getCrumbs(state)
+
+  return (
+    <div className="agency-mockup">
+      <div className="mockup-app">
+        <div className="mockup-topbar">
+          <div className="logo">
+            <div className="logo-mark">A</div>
+            <div>
+              <div className="logo-text">AgencyHub</div>
+              <div className="logo-sub">ระบบจัดการแคมเปญอินฟลูเอนเซอร์</div>
+            </div>
+          </div>
+          <div className="mockup-nav">
+            <button className="btn secondary" onClick={logout} type="button">ออกจากระบบ</button>
+          </div>
+        </div>
+
+        <div className="mockup-breadcrumb">
+          {crumbs.map((crumb, index) => (
+            <span className="crumb-part" key={crumb.label}>
+              {index > 0 ? <span className="sep">›</span> : null}
+              <button className={index === crumbs.length - 1 ? 'current' : ''} disabled={index === crumbs.length - 1} onClick={() => crumb.action?.()} type="button">
+                {crumb.label}
+              </button>
+            </span>
+          ))}
+        </div>
+
+        <main>
+          {state.role === 'brand' && (state.view === 'dashboard'
+            ? <BrandDashboard go={go} />
+            : <BrandCampaign campaign={getCampaign(DB.brands[0].id, state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} />)}
+
+          {state.role === 'owner' && (state.view === 'dashboard'
+            ? <OwnerDashboard allCampaigns={allCampaigns} go={go} />
+            : state.view === 'brand'
+              ? <OwnerBrand brand={getBrand(state.brandId)} go={go} />
+              : <OwnerCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} />)}
+
+          {state.role === 'staff' && (state.view === 'dashboard'
+            ? <StaffDashboard allCampaigns={allCampaigns} go={go} />
+            : state.view === 'brand'
+              ? <StaffBrand brand={getBrand(state.brandId)} go={go} />
+              : <StaffCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} />)}
+        </main>
+      </div>
+    </div>
+  )
+
+  function getCrumbs(current) {
+    const dashboardLabel = current.role === 'brand' ? 'แคมเปญของฉัน' : current.role === 'owner' ? 'แบรนด์ทั้งหมด' : 'แบรนด์ของฉัน'
+    const list = [{ label: dashboardLabel, action: () => go({ view: 'dashboard', brandId: null, campaignId: null }) }]
+    if (current.brandId && current.role !== 'brand') {
+      list.push({ label: getBrand(current.brandId).name, action: () => go({ view: 'brand', campaignId: null }) })
+    }
+    if (current.campaignId) {
+      const brandId = current.brandId || DB.brands[0].id
+      list.push({ label: getCampaign(brandId, current.campaignId).name })
+    }
+    return list
+  }
+}
+
+function BrandDashboard({ go }) {
+  const brand = DB.brands[0]
+  const allTarget = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
+  const allSelected = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
+  const allPosted = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'posted'), 0)
+
+  return (
+    <>
+      <h1 className="page-title">สวัสดี, {brand.name}</h1>
+      <p className="page-sub">ภาพรวมทุกแคมเปญของคุณ และสถานะการคัดเลือก/ลงคอนเทนต์ของอินฟลูเอนเซอร์</p>
+      <div className="grid cols-3 block-gap">
+        <Stat label="แคมเปญทั้งหมด" value={brand.campaigns.length} />
+        <Stat label="อินฟลูที่ยืนยันแล้ว (ทุกแคมเปญ)" value={allSelected} sub={`/ ${allTarget}`} />
+        <Stat label="ลงคลิปแล้วรวม" value={allPosted} sub={`/ ${allSelected}`} />
+      </div>
+      <div className="section-title">แคมเปญของคุณ</div>
+      <div className="grid cols-2">
+        {brand.campaigns.map((campaign) => {
+          const selected = totalTier(campaign, 'brandSelected')
+          const posted = totalTier(campaign, 'posted')
+          const pendingForBrand = totalTier(campaign, 'ownerApproved') - selected
+          return (
+            <CampaignCard
+              campaign={{ ...campaign, meta: `เริ่มลงคลิป ${campaign.startDate} · ครบกำหนด ${campaign.deadlineDate}` }}
+              badge={pendingForBrand > 0 ? <Badge cls="warning">{pendingForBrand} รายชื่อรอคุณตรวจ</Badge> : <Badge cls="primary">{campaign.status}</Badge>}
+              key={campaign.id}
+              onClick={() => go({ view: 'campaign', brandId: brand.id, campaignId: campaign.id, tab: 'select' })}
+            >
+              <ProgressMetric label="ยืนยันแล้ว" value={selected} max={campaign.target} />
+              <ProgressMetric color="#1E9E5C" label="ลงคลิปแล้ว" value={posted} max={selected} />
+            </CampaignCard>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds, state, go }) {
+  return (
+    <>
+      <h1 className="page-title">{campaign.name}</h1>
+      <p className="page-sub">
+        {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}
+        {campaign.briefFile ? <> · <a className="link" href="#">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : null}
+      </p>
+      <Tabs tabs={[['select', 'คัดเลือกอินฟลูเอนเซอร์'], ['progress', 'ความคืบหน้าการลงคลิป']]} active={state.tab} onChange={(tab) => go({ tab })} />
+      {state.tab === 'select'
+        ? <BrandSelectTab campaign={campaign} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} />
+        : <BrandProgressTab campaign={campaign} />}
+    </>
+  )
+}
+
+function BrandSelectTab({ campaign, selectedCandidateIds, setSelectedCandidateIds }) {
+  const selected = totalTier(campaign, 'brandSelected')
+  const submitted = totalTier(campaign, 'sourced')
+  const candidates = campaign.influencers.filter((item) => item.status === 'owner_approved' || item.status === 'brand_selected')
+  const checkedCount = candidates.filter((item) => item.status === 'brand_selected' || selectedCandidateIds.has(item.id)).length
+  const remaining = Math.max(0, campaign.brandQuota - checkedCount)
+
+  function toggleCandidate(id) {
+    setSelectedCandidateIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <>
+      <div className="note-banner">โควต้าที่คุณสามารถเลือกได้สูงสุด <b>{campaign.brandQuota} คน</b> (กำหนดโดยทีม) — ตอนนี้เลือกแล้ว <b>{checkedCount}</b> คน เหลือเลือกได้อีก <b>{remaining}</b> คน</div>
+      <div className="grid cols-4 block-gap">
+        <Stat label="ต้องการทั้งหมด" value={campaign.target} />
+        <Stat label="ทีมส่งรายชื่อมาแล้ว" value={submitted} />
+        <Stat label="หัวหน้าคัดผ่าน (รอคุณเลือก)" value={totalTier(campaign, 'ownerApproved')} />
+        <Stat label="คุณคัดเลือกแล้ว" value={selected} sub={`/ ${campaign.brandQuota}`} />
+      </div>
+      <TierSummaryTable campaign={campaign} />
+      <div className="card">
+        <div className="flex-between table-heading">
+          <div className="section-title no-margin">รายชื่อรอการคัดเลือก <span className="hint">ติ๊กเพื่อเลือก / ยกเลิกการเลือก</span></div>
+          <button className="btn primary" onClick={() => alert('ส่งผลการคัดเลือกกลับให้หัวหน้าแล้ว')} type="button">ยืนยันรายชื่อที่เลือก</button>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <tbody>
+              <tr><th></th><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>สถานะ</th></tr>
+              {candidates.map((item) => {
+                const checked = item.status === 'brand_selected' || selectedCandidateIds.has(item.id)
+                return (
+                  <tr key={item.id}>
+                    <td><input checked={checked} disabled={!checked && checkedCount >= campaign.brandQuota} onChange={() => toggleCandidate(item.id)} type="checkbox" /></td>
+                    <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                    <td><TierBadge tier={item.tier} /></td>
+                    <td className="followers">{item.followers}</td>
+                    <td><StatusBadge status={item.status} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="muted-text table-note">* ตัวอย่างแสดง {candidates.length} รายชื่อ จากทั้งหมด {totalTier(campaign, 'ownerApproved')} รายชื่อที่หัวหน้าคัดผ่านแล้ว</div>
+      </div>
+    </>
+  )
+}
+
+function BrandProgressTab({ campaign }) {
+  const rows = campaign.influencers.filter((item) => item.status === 'confirmed')
+  return <InfluencerProgressTable rows={rows} />
+}
+
+function OwnerDashboard({ allCampaigns, go }) {
+  const sumTarget = allCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
+  const sumConfirmed = allCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
+  const pendingReview = allCampaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner').length, 0)
+
+  return (
+    <>
+      <h1 className="page-title">ภาพรวมทั้งหมด</h1>
+      <p className="page-sub">สรุปทุกแบรนด์และแคมเปญที่กำลังดำเนินการ</p>
+      <div className="grid cols-4 block-gap">
+        <Stat label="แบรนด์ที่ดูแล" value={DB.brands.length} />
+        <Stat label="แคมเปญทั้งหมด" value={allCampaigns.length} />
+        <Stat label="อินฟลูยืนยันแล้ว / เป้า" value={sumConfirmed} sub={`/ ${sumTarget}`} />
+        <Stat label="รอตรวจจากทีม" value={pendingReview} tone="warning" />
+      </div>
+      <div className="section-title">รายชื่อแบรนด์</div>
+      <div className="grid cols-2">
+        {DB.brands.map((brand) => {
+          const target = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
+          const selected = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
+          const pending = brand.campaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner').length, 0)
+          return (
+            <CampaignCard
+              campaign={{ ...brand, meta: `${brand.campaigns.length} แคมเปญ` }}
+              badge={pending > 0 ? <Badge cls="warning">{pending} รอตรวจ</Badge> : <Badge>อัปเดตล่าสุด</Badge>}
+              key={brand.id}
+              onClick={() => go({ view: 'brand', brandId: brand.id })}
+            >
+              <ProgressMetric label="ยืนยันแล้ว" value={selected} max={target} />
+            </CampaignCard>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function OwnerBrand({ brand, go }) {
+  return (
+    <>
+      <div className="flex-between">
+        <div>
+          <h1 className="page-title">{brand.name}</h1>
+          <p className="page-sub">แคมเปญทั้งหมดของแบรนด์นี้</p>
+        </div>
+        <button className="btn primary" onClick={() => alert('เปิดฟอร์มสร้างแคมเปญใหม่ + อัปโหลดบรีฟ')} type="button">+ สร้างแคมเปญใหม่</button>
+      </div>
+      <div className="grid cols-2">
+        {brand.campaigns.map((campaign) => {
+          const confirmed = totalTier(campaign, 'brandSelected')
+          const posted = totalTier(campaign, 'posted')
+          const pending = campaign.influencers.filter((item) => item.status === 'pending_owner').length
+          return (
+            <CampaignCard
+              campaign={{ ...campaign, meta: `เริ่มลงคลิป ${campaign.startDate} · ครบกำหนด ${campaign.deadlineDate}` }}
+              badge={pending > 0 ? <Badge cls="warning">{pending} รอตรวจ</Badge> : <Badge cls="primary">{campaign.status}</Badge>}
+              key={campaign.id}
+              onClick={() => go({ view: 'campaign', campaignId: campaign.id, tab: 'review' })}
+            >
+              <ProgressMetric label="ยืนยันแล้ว / เป้า" value={confirmed} max={campaign.target} />
+              <ProgressMetric color="#1E9E5C" label="ลงคลิปแล้ว" value={posted} max={confirmed} />
+            </CampaignCard>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function OwnerCampaign({ brand, campaign, state, go }) {
+  return (
+    <>
+      <h1 className="page-title">{campaign.name}</h1>
+      <p className="page-sub">{brand.name} · {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}</p>
+      <Tabs tabs={[['review', 'ตรวจรายชื่อจากทีม'], ['setup', 'บรีฟ & เป้าหมาย'], ['prod', 'ภาพรวมการผลิตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
+      {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} /> : <OwnerProductionTab campaign={campaign} />}
+    </>
+  )
+}
+
+function OwnerReviewTab({ campaign }) {
+  const pending = campaign.influencers.filter((item) => item.status === 'pending_owner')
+  const approvedWaitingBrand = campaign.influencers.filter((item) => item.status === 'owner_approved')
+  const selectedByBrand = campaign.influencers.filter((item) => item.status === 'brand_selected')
+
+  return (
+    <>
+      <div className="grid cols-4 block-gap">
+        <Stat label="เป้าหมายรวม" value={campaign.target} />
+        <Stat label="ทีมส่งมาแล้ว" value={totalTier(campaign, 'sourced')} />
+        <Stat label="ส่งให้แบรนด์แล้ว" value={totalTier(campaign, 'ownerApproved')} />
+        <Stat label="แบรนด์ยืนยันแล้ว" value={totalTier(campaign, 'brandSelected')} sub={`/ ${campaign.brandQuota}`} />
+      </div>
+      <ReviewCard rows={pending} title="รายชื่อใหม่จากทีม — รอการตรวจสอบ" actionLabel={pending.length ? 'ส่งที่อนุมัติให้แบรนด์' : ''} />
+      <SimpleInfluencerCard rows={approvedWaitingBrand} title={`ส่งให้แบรนด์แล้ว — รอแบรนด์เลือก (${approvedWaitingBrand.length})`} />
+      <SimpleInfluencerCard rows={selectedByBrand} title={`แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})`} actionLabel={selectedByBrand.length ? 'ยืนยัน & แจ้งทีม' : ''} />
+    </>
+  )
+}
+
+function OwnerSetupTab({ campaign }) {
+  return (
+    <>
+      <div className="grid cols-2">
+        <div className="card">
+          <div className="section-title">ไฟล์บรีฟ</div>
+          {campaign.briefFile ? (
+            <div className="flex-between table-heading">
+              <div>
+                <div className="cell-name">{campaign.briefFile}</div>
+                <div className="cell-sub">เวอร์ชัน {campaign.briefVersion} · อัปโหลดเมื่อ {campaign.briefDate}</div>
+              </div>
+              <a className="link" href="#">ดาวน์โหลด</a>
+            </div>
+          ) : <EmptyState icon="เอกสาร" title="ยังไม่มีไฟล์บรีฟ" desc="อัปโหลดบรีฟเพื่อให้ทีมเริ่มหาอินฟลูได้" />}
+          <button className="btn secondary" onClick={() => alert('เปิดหน้าต่างอัปโหลดบรีฟใหม่')} type="button">{campaign.briefFile ? 'อัปโหลดบรีฟเวอร์ชันใหม่' : 'อัปโหลดบรีฟ'}</button>
+        </div>
+        <div className="card">
+          <div className="section-title">เป้าหมาย & โควต้าการคัดเลือก</div>
+          <Field label="จำนวนอินฟลูที่ต้องการทั้งหมด" type="number" value={campaign.target} />
+          <Field label="โควต้าที่แบรนด์เลือกได้สูงสุด" type="number" value={campaign.brandQuota} />
+          <button className="btn primary" onClick={() => alert('บันทึกการตั้งค่าแล้ว')} type="button">บันทึก</button>
+        </div>
+      </div>
+      <div className="card target-card">
+        <div className="section-title">เป้าหมายแยกตามระดับอินฟลูเอนเซอร์</div>
+        <div className="grid cols-5">
+          {TIERS.map((tier) => <Field key={tier} label={tier} type="number" value={campaign.tierStats[tier].target} />)}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function OwnerProductionTab({ campaign }) {
+  const rows = campaign.influencers.filter((item) => item.status === 'confirmed')
+  const counts = { waiting: 0, review: 0, revise: 0, approved: 0, posted: 0 }
+  rows.forEach((row) => { counts[row.draft] += 1 })
+  return (
+    <>
+      <div className="grid cols-5 block-gap">
+        {Object.entries(counts).map(([key, value]) => <Stat key={key} label={DRAFT_MAP[key].label} value={value} tone={key === 'review' ? 'warning' : key === 'revise' ? 'danger' : key === 'posted' ? 'success' : undefined} />)}
+      </div>
+      <InfluencerProgressTable rows={rows} title="รายการอินฟลูที่กำลังผลิตคอนเทนต์" withOwner />
+    </>
+  )
+}
+
+function StaffDashboard({ allCampaigns, go }) {
+  const sumFound = allCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'sourced'), 0)
+  const sumTarget = allCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
+  return (
+    <>
+      <h1 className="page-title">งานของฉัน</h1>
+      <p className="page-sub">เลือกแบรนด์เพื่อดูแคมเปญและบรีฟที่ต้องหาอินฟลู</p>
+      <div className="grid cols-3 block-gap">
+        <Stat label="แบรนด์ที่ดูแล" value={DB.brands.length} />
+        <Stat label="แคมเปญทั้งหมด" value={allCampaigns.length} />
+        <Stat label="หาได้แล้ว / เป้ารวม" value={sumFound} sub={`/ ${sumTarget}`} />
+      </div>
+      <div className="grid cols-2">
+        {DB.brands.map((brand) => {
+          const found = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'sourced'), 0)
+          const target = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
+          return (
+            <CampaignCard campaign={{ ...brand, meta: `${brand.campaigns.length} แคมเปญ / บรีฟ` }} key={brand.id} onClick={() => go({ view: 'brand', brandId: brand.id })}>
+              <ProgressMetric label="หาได้แล้ว" value={found} max={target} />
+            </CampaignCard>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function StaffBrand({ brand, go }) {
+  return (
+    <>
+      <h1 className="page-title">{brand.name}</h1>
+      <p className="page-sub">บรีฟ/แคมเปญทั้งหมดของแบรนด์นี้</p>
+      <div className="grid cols-2">
+        {brand.campaigns.map((campaign) => (
+          <CampaignCard
+            campaign={{ ...campaign, meta: campaign.briefFile ? campaign.briefFile : 'ยังไม่มีไฟล์บรีฟ' }}
+            badge={<Badge cls="primary">{campaign.status}</Badge>}
+            key={campaign.id}
+            onClick={() => go({ view: 'campaign', campaignId: campaign.id, tab: 'source' })}
+          >
+            <ProgressMetric label="หาได้แล้ว" value={totalTier(campaign, 'sourced')} max={campaign.target} />
+          </CampaignCard>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function StaffCampaign({ brand, campaign, state, go }) {
+  return (
+    <>
+      <h1 className="page-title">{campaign.name}</h1>
+      <p className="page-sub">{brand.name} · {campaign.status} {campaign.briefFile ? <>· <a className="link" href="#">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : '· ยังไม่มีไฟล์บรีฟ'}</p>
+      <Tabs tabs={[['source', 'หาอินฟลูเอนเซอร์'], ['track', 'ติดตามงาน / อัปเดตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
+      {state.tab === 'source' ? <StaffSourceTab campaign={campaign} /> : <StaffTrackTab campaign={campaign} />}
+    </>
+  )
+}
+
+function StaffSourceTab({ campaign }) {
+  if (campaign.influencers.length === 0 && !campaign.briefFile) {
+    return <EmptyState icon="เอกสาร" title="ยังไม่มีบรีฟสำหรับแคมเปญนี้" desc="รอหัวหน้าอัปโหลดไฟล์บรีฟและตั้งเป้าหมายก่อนเริ่มหาอินฟลูเอนเซอร์" />
+  }
+
+  return (
+    <>
+      <div className="card block-gap">
+        <div className="section-title">เป้าหมายแยกตามระดับ <span className="hint">หาได้แล้ว / เป้าหมาย</span></div>
+        <div className="grid cols-5">
+          {TIERS.map((tier) => {
+            const stat = campaign.tierStats[tier]
+            return <ProgressMetric color={TIER_COLOR[tier]} key={tier} label={<TierBadge tier={tier} />} value={stat.sourced} max={stat.target} />
+          })}
+        </div>
+      </div>
+      <div className="card block-gap">
+        <div className="section-title">เพิ่มอินฟลูเอนเซอร์ใหม่</div>
+        <div className="dup-banner">ระบบจะแจ้งเตือนหากลิงก์ช่องทางนี้มีคนในทีมเพิ่มไว้แล้ว เพื่อป้องกันการคัดซ้ำ</div>
+        <div className="grid cols-4">
+          <Field label="ชื่ออินฟลูเอนเซอร์" placeholder="เช่น Beauty by Ploy" />
+          <Field label="ลิงก์ช่องทาง" placeholder="วางลิงก์ IG / TikTok / YouTube" />
+          <Field label="ระดับ" options={TIERS} />
+          <Field label="วันที่ดีลงานสำเร็จ" type="date" />
+        </div>
+        <button className="btn primary form-action" onClick={() => alert('เพิ่มรายชื่อแล้ว — สถานะ: รอหัวหน้าตรวจ')} type="button">+ เพิ่มรายชื่อ</button>
+      </div>
+      <div className="card">
+        <div className="flex-between table-heading">
+          <div className="section-title no-margin">รายชื่อที่ทีมหามาแล้ว ({campaign.influencers.length})</div>
+          <button className="btn primary" onClick={() => alert('ส่งรายชื่อทั้งหมดให้หัวหน้าตรวจแล้ว')} type="button">ส่งให้หัวหน้าตรวจ</button>
+        </div>
+        <InfluencerListTable rows={campaign.influencers} staffMode />
+        <div className="muted-text table-note">* แถวสีจางคือรายชื่อที่เพื่อนในทีมเพิ่มไว้ — ดูได้อย่างเดียว แก้ไขไม่ได้ เพื่อป้องกันข้อมูลชนกัน</div>
+      </div>
+    </>
+  )
+}
+
+function StaffTrackTab({ campaign }) {
+  const rows = campaign.influencers.filter((item) => item.status === 'confirmed')
+  if (!rows.length) return <EmptyState icon="งาน" title="ยังไม่มีรายชื่อที่ถูกยืนยัน" desc="เมื่อหัวหน้ายืนยันรายชื่อสุดท้ายจากแบรนด์ รายชื่อจะมาแสดงที่นี่เพื่อให้อัปเดตงานได้" />
+  return (
+    <>
+      <div className="note-banner">อัปเดตสถานะของแต่ละคนทุกวันจนกว่าจะลงคลิปครบ — หัวหน้าจะเห็นการอัปเดตนี้แบบเรียลไทม์</div>
+      <div className="card">
+        <EditableTrackTable rows={rows} />
+        <button className="btn primary form-action" onClick={() => alert('บันทึกการอัปเดตแล้ว')} type="button">บันทึกการอัปเดต</button>
+      </div>
+    </>
+  )
+}
+
+function Tabs({ tabs, active, onChange }) {
+  return (
+    <div className="tabs">
+      {tabs.map(([key, label]) => (
+        <button className={active === key ? 'active' : ''} key={key} onClick={() => onChange(key)} type="button">{label}</button>
+      ))}
+    </div>
+  )
+}
+
+function ProgressMetric({ label, value, max, color = '#4C5FD5' }) {
+  return (
+    <div className="progress-metric">
+      <div className="pbar-row"><span>{label}</span><span>{value} / {max}</span></div>
+      <ProgressBar color={color} max={max} value={value} />
+    </div>
+  )
+}
+
+function TierSummaryTable({ campaign }) {
+  return (
+    <div className="card block-gap">
+      <div className="section-title">สัดส่วนตามระดับอินฟลูเอนเซอร์ <span className="hint">เป้าหมาย vs คัดผ่านแล้ว vs ที่คุณเลือกแล้ว</span></div>
+      <div className="table-wrap">
+        <table>
+          <tbody>
+            <tr><th>ระดับ</th><th>เป้าหมาย</th><th>หัวหน้าคัดผ่าน</th><th>คุณเลือกแล้ว</th><th>สัดส่วน</th></tr>
+            {TIERS.map((tier) => {
+              const stat = campaign.tierStats[tier]
+              return (
+                <tr key={tier}>
+                  <td><TierBadge tier={tier} /></td>
+                  <td>{stat.target}</td>
+                  <td>{stat.ownerApproved}</td>
+                  <td><b>{stat.brandSelected}</b></td>
+                  <td className="wide-progress"><ProgressBar color={TIER_COLOR[tier]} max={stat.target} value={stat.brandSelected} /></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ReviewCard({ rows, title, actionLabel }) {
+  return (
+    <div className="card block-gap">
+      <div className="flex-between table-heading">
+        <div className="section-title no-margin">{title}</div>
+        {actionLabel ? <button className="btn primary" onClick={() => alert('ส่งรายชื่อที่อนุมัติทั้งหมดให้แบรนด์แล้ว')} type="button">{actionLabel}</button> : null}
+      </div>
+      {rows.length === 0 ? <EmptyState icon="เรียบร้อย" title="ไม่มีรายชื่อรอตรวจ" desc="ทีมยังไม่ส่งรายชื่อใหม่เข้ามาในขณะนี้" /> : (
+        <div className="table-wrap">
+          <table>
+            <tbody>
+              <tr><th></th><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th>การตัดสิน</th></tr>
+              {rows.map((item) => (
+                <tr key={item.id}>
+                  <td></td>
+                  <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                  <td><TierBadge tier={item.tier} /></td>
+                  <td className="followers">{item.followers}</td>
+                  <td>{item.addedBy}</td>
+                  <td className="button-cell">
+                    <button className="btn sm primary" onClick={() => alert('คัดผ่าน → ส่งให้แบรนด์')} type="button">คัดผ่าน</button>
+                    <button className="btn sm secondary" onClick={() => alert('คัดออก')} type="button">คัดออก</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SimpleInfluencerCard({ rows, title, actionLabel }) {
+  return (
+    <div className="card block-gap">
+      <div className="flex-between table-heading">
+        <div className="section-title no-margin">{title}</div>
+        {actionLabel ? <button className="btn primary" onClick={() => alert('ยืนยันรายชื่อสุดท้าย และแจ้งทีมให้เริ่มงาน + ส่งสินค้า')} type="button">{actionLabel}</button> : null}
+      </div>
+      <InfluencerListTable rows={rows} />
+    </div>
+  )
+}
+
+function InfluencerListTable({ rows, staffMode = false }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <tbody>
+          <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th>{staffMode ? 'วันดีลงาน' : 'สถานะ'}</th>{staffMode ? <th>สถานะ</th> : null}</tr>
+          {rows.map((item) => {
+            const isMine = item.addedBy === CURRENT_STAFF
+            return (
+              <tr className={staffMode && !isMine ? 'row-muted' : ''} key={item.id}>
+                <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                <td><TierBadge tier={item.tier} /></td>
+                <td className="followers">{item.followers}</td>
+                <td>{item.addedBy}{staffMode && isMine ? <span className="cell-sub"> (ของฉัน)</span> : null}</td>
+                {staffMode ? <td>{item.dealDate}</td> : null}
+                <td><StatusBadge status={item.status} /></td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function InfluencerProgressTable({ rows, title = 'รายชื่อที่ยืนยันแล้ว & สถานะลงคอนเทนต์', withOwner = false }) {
+  return (
+    <div className="card">
+      <div className="section-title">{title}</div>
+      <div className="table-wrap">
+        <table>
+          <tbody>
+            <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th>{withOwner ? <th>ผู้ดูแล</th> : null}<th>วันดีลงาน</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th></tr>
+            {rows.map((item) => (
+              <tr key={item.id}>
+                <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+                <td><TierBadge tier={item.tier} /></td>
+                {withOwner ? <td>{item.addedBy}</td> : null}
+                <td>{item.dealDate}</td>
+                <td><DraftBadge draft={item.draft} /></td>
+                <td>{item.postDate}</td>
+                <td>{item.postLink ? <a className="link" href="#">{item.postLink}</a> : <span className="muted-text">—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function EditableTrackTable({ rows }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <tbody>
+          <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>วันดีลงาน</th><th>ส่งสินค้าแล้ว</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th></tr>
+          {rows.map((item) => (
+            <tr key={item.id}>
+              <td><div className="cell-name">{item.name}</div><div className="cell-sub">{item.channel}</div></td>
+              <td><TierBadge tier={item.tier} /></td>
+              <td>{item.dealDate}</td>
+              <td><input defaultChecked={item.draft !== 'waiting'} type="checkbox" /></td>
+              <td>
+                <select className="draft-select" defaultValue={item.draft}>
+                  {Object.entries(DRAFT_MAP).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
+                </select>
+              </td>
+              <td><input className="compact-input" defaultValue={item.draft === 'posted' ? '2026-07-05' : ''} type="date" /></td>
+              <td><input className="link-input" defaultValue={item.postLink} placeholder="วางลิงก์คลิปที่นี่" type="text" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function Field({ label, options, type = 'text', value, placeholder }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      {options
+        ? <select defaultValue={options[0]}>{options.map((option) => <option key={option}>{option}</option>)}</select>
+        : <input defaultValue={value} placeholder={placeholder} type={type} />}
+    </div>
+  )
+}
+
+export default MockupDashboard

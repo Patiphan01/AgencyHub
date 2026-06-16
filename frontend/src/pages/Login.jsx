@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import { roles } from '../mock/agencyData'
 
+const roleLabels = {
+  Brand: 'แบรนด์',
+  Owner: 'หัวหน้า',
+  Staff: 'พนักงาน',
+}
+
 function Login() {
   const [selectedRole, setSelectedRole] = useState('Owner')
   const navigate = useNavigate()
@@ -55,7 +61,7 @@ function Login() {
                   onClick={() => setSelectedRole(role)}
                   type="button"
                 >
-                  {role}
+                  {roleLabels[role] || role}
                 </button>
               ))}
             </div>

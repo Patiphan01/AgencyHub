@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgencyHub — UX/UI Mockup</title>
+<style>
+:root{
+  --bg:#F4F5FA;
+  --card:#FFFFFF;
+  --border:#E6E8F0;
+  --text:#1E2233;
+  --text2:#7A7F8E;
+  --primary:#4C5FD5;
+  --primary-light:#EEF1FE;
+  --success:#1E9E5C;
+  --success-light:#E5F6ED;
+  --warning:#B8790A;
+  --warning-light:#FCF1DE;
+  --danger:#D6453D;
+  --danger-light:#FBEAE9;
+  --muted:#9097A8;
+  --muted-light:#F0F1F5;
+  --radius:14px;
+  --radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.app{max-width:1180px;margin:0 auto;padding:18px 20px 60px;}
+
+/* Topbar */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;
+  padding-bottom:16px;
+}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{
+  width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,#4C5FD5,#7B8CFF);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:700;font-size:15px;
+}
+.logo-text{font-weight:700;font-size:17px;letter-spacing:-0.3px;}
+.logo-sub{font-size:11.5px;color:var(--text2);margin-top:-2px;}
+
+.role-switch{
+  display:flex;background:var(--card);border:1px solid var(--border);
+  border-radius:999px;padding:4px;gap:2px;
+}
+.role-switch button{
+  border:none;background:transparent;padding:8px 16px;border-radius:999px;
+  font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.role-switch button.active{background:var(--primary);color:#fff;}
+.role-switch button:not(.active):hover{color:var(--text);}
+
+/* Breadcrumb */
+.breadcrumb{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:13px;color:var(--text2);margin-bottom:16px;
+}
+.breadcrumb span.sep{color:#C7CAD6;}
+.breadcrumb button{
+  border:none;background:none;color:var(--text2);cursor:pointer;
+  font-size:13px;padding:2px 4px;border-radius:6px;font-weight:500;
+}
+.breadcrumb button.current{color:var(--text);font-weight:700;cursor:default;}
+.breadcrumb button:not(.current):hover{color:var(--primary);text-decoration:underline;}
+
+/* Layout helpers */
+h1.page-title{font-size:21px;font-weight:800;letter-spacing:-0.3px;margin-bottom:2px;}
+.page-sub{color:var(--text2);font-size:13px;margin-bottom:18px;}
+.grid{display:grid;gap:14px;}
+.grid.cols-2{grid-template-columns:1fr 1fr;}
+.grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
+.grid.cols-4{grid-template-columns:repeat(4,1fr);}
+.grid.cols-5{grid-template-columns:repeat(5,1fr);}
+@media(max-width:900px){
+  .grid.cols-2,.grid.cols-3,.grid.cols-4,.grid.cols-5{grid-template-columns:1fr 1fr;}
+}
+
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:18px;
+}
+.card.pad-sm{padding:14px;}
+.section-title{font-size:15px;font-weight:800;margin-bottom:10px;letter-spacing:-0.2px;}
+.section-title .hint{font-size:12px;color:var(--text2);font-weight:500;margin-left:6px;}
+
+/* Stat card */
+.stat{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;
+}
+.stat .label{font-size:12px;color:var(--text2);font-weight:600;margin-bottom:6px;}
+.stat .value{font-size:24px;font-weight:800;letter-spacing:-0.5px;}
+.stat .value small{font-size:13px;font-weight:600;color:var(--text2);}
+
+/* Progress bar */
+.pbar{height:8px;border-radius:999px;background:var(--muted-light);overflow:hidden;}
+.pbar > div{height:100%;border-radius:999px;}
+.pbar-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;color:var(--text2);font-weight:600;}
+
+/* Campaign card */
+.camp-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;cursor:pointer;transition:.15s;
+}
+.camp-card:hover{border-color:var(--primary);box-shadow:0 4px 16px rgba(76,95,213,.10);}
+.camp-card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;}
+.camp-card h3{font-size:15px;font-weight:800;letter-spacing:-0.2px;}
+.camp-card .meta{font-size:12px;color:var(--text2);margin-top:2px;}
+
+/* Badges */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;
+}
+.badge.primary{background:var(--primary-light);color:var(--primary);}
+.badge.success{background:var(--success-light);color:var(--success);}
+.badge.warning{background:var(--warning-light);color:var(--warning);}
+.badge.danger{background:var(--danger-light);color:var(--danger);}
+.badge.muted{background:var(--muted-light);color:var(--muted);}
+.tier-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+/* Table */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{
+  text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--text2);font-weight:700;padding:10px 12px;border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr.row-muted{opacity:.55;}
+.cell-name{font-weight:700;}
+.cell-sub{font-size:12px;color:var(--text2);}
+a.link{color:var(--primary);text-decoration:none;font-weight:600;}
+a.link:hover{text-decoration:underline;}
+
+/* Buttons */
+.btn{
+  border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s;
+}
+.btn.primary{background:var(--primary);color:#fff;}
+.btn.primary:hover{background:#3d4ec2;}
+.btn.primary:disabled{background:#C7CCEE;cursor:not-allowed;}
+.btn.secondary{background:var(--muted-light);color:var(--text);}
+.btn.secondary:hover{background:#E4E6EE;}
+.btn.ghost{background:transparent;color:var(--primary);border:1px solid var(--border);}
+.btn.sm{padding:6px 12px;font-size:12px;border-radius:8px;}
+
+/* Empty state */
+.empty{
+  text-align:center;padding:40px 20px;color:var(--text2);
+}
+.empty .icon{font-size:30px;margin-bottom:10px;}
+.empty .title{font-weight:800;color:var(--text);font-size:14px;margin-bottom:4px;}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.tabs button{
+  border:none;background:none;padding:10px 4px;margin-right:18px;font-size:13.5px;font-weight:700;
+  color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;
+}
+.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);}
+
+/* Form bits */
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:12px;font-weight:700;color:var(--text2);}
+.field input, .field select{
+  border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:13px;font-family:inherit;
+  background:#fff;
+}
+.field input:focus, .field select:focus{outline:2px solid var(--primary-light);border-color:var(--primary);}
+
+.flex-between{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.note-banner{
+  background:var(--primary-light);color:var(--primary);border-radius:10px;
+  padding:10px 14px;font-size:12.5px;font-weight:600;margin-bottom:14px;
+}
+.dup-banner{
+  background:var(--danger-light);color:var(--danger);border-radius:10px;
+  padding:10px 14px;font-size:12.5px;font-weight:600;margin-bottom:14px;
+}
+.followers{font-size:12px;color:var(--text2);}
+.muted-text{color:var(--text2);font-size:12.5px;}
+.divider{height:1px;background:var(--border);margin:16px 0;}
+select.draft-select{font-weight:700;font-size:12px;padding:6px 8px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-mark">A</div>
+      <div>
+        <div class="logo-text">AgencyHub</div>
+        <div class="logo-sub">ระบบจัดการแคมเปญอินฟลูเอนเซอร์</div>
+      </div>
+    </div>
+    <div class="role-switch" id="roleSwitch"></div>
+  </div>
+  <div class="breadcrumb" id="breadcrumb"></div>
+  <main id="content"></main>
+</div>
+
+<script>
+/* ===================== DATA ===================== */
+const TIERS = ['Nano','Micro','Mid','Macro','Mega'];
+const TIER_COLOR = { Nano:'#0EA5A6', Micro:'#3B82F6', Mid:'#F59E0B', Macro:'#EF4444', Mega:'#8B5CF6' };
+const TIER_LABEL = { Nano:'Nano (1K-10K)', Micro:'Micro (10K-50K)', Mid:'Mid (50K-200K)', Macro:'Macro (200K-1M)', Mega:'Mega/KOL (1M+)' };
+
+const STATUS_MAP = {
+  pending_owner:  {label:'รอหัวหน้าตรวจ', cls:'warning'},
+  owner_approved: {label:'หัวหน้าคัดผ่าน · รอแบรนด์เลือก', cls:'primary'},
+  owner_rejected: {label:'หัวหน้าคัดออก', cls:'muted'},
+  brand_selected: {label:'แบรนด์เลือกแล้ว', cls:'success'},
+  brand_rejected: {label:'แบรนด์ไม่เลือก', cls:'muted'},
+  confirmed:      {label:'ยืนยันแล้ว · กำลังผลิตคอนเทนต์', cls:'success'},
+};
+const DRAFT_MAP = {
+  waiting:  {label:'รอส่งดราฟ', cls:'muted'},
+  review:   {label:'ส่งดราฟแล้ว · รอตรวจ', cls:'warning'},
+  revise:   {label:'ขอแก้ไขดราฟ', cls:'danger'},
+  approved: {label:'ดราฟผ่านแล้ว', cls:'primary'},
+  posted:   {label:'ลงคลิปแล้ว', cls:'success'},
+};
+
+function makeStats(t){ // helper: target -> generate sourced/approved/selected/confirmed/posted
+  return {target:t.target, sourced:t.sourced, ownerApproved:t.oa, brandSelected:t.bs, confirmed:t.bs, posted:t.posted};
+}
+
+const DB = {
+  brands: [
+    {
+      id:'b1', name:'GlowSkin Cosmetics', initials:'GS',
+      campaigns: [
+        {
+          id:'c1', name:'Hydra Glow Serum — Launch Campaign',
+          status:'กำลังคัดเลือกอินฟลู',
+          startDate:'1 ก.ค. 2569', deadlineDate:'20 ก.ค. 2569',
+          target:300, brandQuota:300,
+          briefFile:'GlowSkin_HydraGlow_Brief_v2.pdf', briefVersion:'v2', briefDate:'10 มิ.ย. 2569',
+          tierStats:{
+            Nano:  makeStats({target:120, sourced:135, oa:125, bs:115, posted:58}),
+            Micro: makeStats({target:100, sourced:92,  oa:88,  bs:85,  posted:48}),
+            Mid:   makeStats({target:50,  sourced:47,  oa:44,  bs:43,  posted:19}),
+            Macro: makeStats({target:25,  sourced:21,  oa:19,  bs:18,  posted:7}),
+            Mega:  makeStats({target:5,   sourced:4,   oa:3,   bs:3,   posted:1}),
+          },
+          influencers:[
+            {id:1,name:'Mai Cosmetic Diary',channel:'instagram.com/maicosmeticdiary',tier:'Nano',followers:'8.4K',addedBy:'แนน',dealDate:'20 มิ.ย. 2569',status:'confirmed',draft:'posted',postDate:'5 ก.ค. 2569',postLink:'instagram.com/p/abc123'},
+            {id:2,name:'Beauty by Ploy',channel:'tiktok.com/@beautybyploy',tier:'Micro',followers:'32K',addedBy:'แนน',dealDate:'22 มิ.ย. 2569',status:'confirmed',draft:'approved',postDate:'-',postLink:''},
+            {id:3,name:'SkinCareGuy',channel:'youtube.com/skincareguy',tier:'Nano',followers:'6.1K',addedBy:'ต้น',dealDate:'21 มิ.ย. 2569',status:'confirmed',draft:'revise',postDate:'-',postLink:''},
+            {id:4,name:'Fah Beauty Talk',channel:'instagram.com/fahbeautytalk',tier:'Mid',followers:'88K',addedBy:'ต้น',dealDate:'23 มิ.ย. 2569',status:'confirmed',draft:'review',postDate:'-',postLink:''},
+            {id:5,name:'Glow with Gam',channel:'tiktok.com/@glowwithgam',tier:'Macro',followers:'420K',addedBy:'แนน',dealDate:'25 มิ.ย. 2569',status:'confirmed',draft:'waiting',postDate:'-',postLink:''},
+            {id:6,name:'The Skin Diary',channel:'instagram.com/theskindiary',tier:'Micro',followers:'45K',addedBy:'บีม',dealDate:'-',status:'brand_selected',draft:'',postDate:'',postLink:''},
+            {id:7,name:'Nicha Reviews',channel:'tiktok.com/@nichareviews',tier:'Nano',followers:'4.2K',addedBy:'บีม',dealDate:'-',status:'owner_approved',draft:'',postDate:'',postLink:''},
+            {id:8,name:'Cosmetic King',channel:'youtube.com/cosmeticking',tier:'Mega',followers:'1.4M',addedBy:'ต้น',dealDate:'-',status:'owner_approved',draft:'',postDate:'',postLink:''},
+            {id:9,name:'Sweet Skin Sara',channel:'instagram.com/sweetskinsara',tier:'Micro',followers:'28K',addedBy:'แนน',dealDate:'-',status:'pending_owner',draft:'',postDate:'',postLink:''},
+            {id:10,name:'Daily Glow TH',channel:'tiktok.com/@dailyglowth',tier:'Nano',followers:'9.8K',addedBy:'บีม',dealDate:'-',status:'owner_rejected',draft:'',postDate:'',postLink:''},
+          ]
+        },
+        {
+          id:'c2', name:'Sunscreen SPF50 — Always-on Campaign',
+          status:'กำลังผลิตคอนเทนต์',
+          startDate:'15 พ.ค. 2569', deadlineDate:'30 มิ.ย. 2569',
+          target:150, brandQuota:150,
+          briefFile:'GlowSkin_SPF50_Brief_v1.pdf', briefVersion:'v1', briefDate:'2 พ.ค. 2569',
+          tierStats:{
+            Nano:  makeStats({target:60, sourced:60, oa:58, bs:55, posted:55}),
+            Micro: makeStats({target:50, sourced:50, oa:48, bs:47, posted:45}),
+            Mid:   makeStats({target:30, sourced:29, oa:28, bs:27, posted:20}),
+            Macro: makeStats({target:8,  sourced:8,  oa:7,  bs:7,  posted:5}),
+            Mega:  makeStats({target:2,  sourced:2,  oa:2,  bs:2,  posted:1}),
+          },
+          influencers:[
+            {id:11,name:'Aom Sunny Day',channel:'instagram.com/aomsunnyday',tier:'Micro',followers:'38K',addedBy:'แนน',dealDate:'5 มิ.ย. 2569',status:'confirmed',draft:'posted',postDate:'18 มิ.ย. 2569',postLink:'instagram.com/p/sun001'},
+            {id:12,name:'UV Defense TH',channel:'tiktok.com/@uvdefenseth',tier:'Nano',followers:'7.7K',addedBy:'ต้น',dealDate:'4 มิ.ย. 2569',status:'confirmed',draft:'posted',postDate:'17 มิ.ย. 2569',postLink:'tiktok.com/@uvdefenseth/video/9981'},
+            {id:13,name:'Beach Skin Bun',channel:'instagram.com/beachskinbun',tier:'Mid',followers:'120K',addedBy:'บีม',dealDate:'6 มิ.ย. 2569',status:'confirmed',draft:'revise',postDate:'-',postLink:''},
+            {id:14,name:'Plern Beauty Lab',channel:'youtube.com/plernbeautylab',tier:'Macro',followers:'310K',addedBy:'ต้น',dealDate:'7 มิ.ย. 2569',status:'confirmed',draft:'review',postDate:'-',postLink:''},
+            {id:15,name:'Cherry Sunscreen Diary',channel:'tiktok.com/@cherrysunscreen',tier:'Micro',followers:'21K',addedBy:'แนน',dealDate:'8 มิ.ย. 2569',status:'confirmed',draft:'approved',postDate:'-',postLink:''},
+            {id:16,name:'SkinFirst Nat',channel:'instagram.com/skinfirstnat',tier:'Nano',followers:'5.5K',addedBy:'บีม',dealDate:'9 มิ.ย. 2569',status:'confirmed',draft:'waiting',postDate:'-',postLink:''},
+          ]
+        }
+      ]
+    },
+    {
+      id:'b2', name:'FitFuel Protein', initials:'FF',
+      campaigns: [
+        {
+          id:'c3', name:'Whey Protein — New Flavor Launch',
+          status:'รอบรีฟจากหัวหน้า',
+          startDate:'-', deadlineDate:'-',
+          target:80, brandQuota:80,
+          briefFile:null, briefVersion:null, briefDate:null,
+          tierStats:{
+            Nano:  makeStats({target:30, sourced:0, oa:0, bs:0, posted:0}),
+            Micro: makeStats({target:30, sourced:0, oa:0, bs:0, posted:0}),
+            Mid:   makeStats({target:15, sourced:0, oa:0, bs:0, posted:0}),
+            Macro: makeStats({target:5,  sourced:0, oa:0, bs:0, posted:0}),
+            Mega:  makeStats({target:0,  sourced:0, oa:0, bs:0, posted:0}),
+          },
+          influencers:[]
+        }
+      ]
+    }
+  ]
+};
+
+const CURRENT_STAFF = 'แนน'; // logged-in staff name for "owned row" highlighting
+
+/* ===================== STATE ===================== */
+let state = { role:'brand', view:'dashboard', brandId:null, campaignId:null, tab:'review' };
+
+function go(next){ state = {...state, ...next}; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function getBrand(id){ return DB.brands.find(b=>b.id===id); }
+function getCampaign(bId,cId){ return getBrand(bId).campaigns.find(c=>c.id===cId); }
+function totalTier(camp,key){ return TIERS.reduce((s,t)=>s+camp.tierStats[t][key],0); }
+
+/* ===================== SMALL COMPONENTS ===================== */
+function badge(text,cls){ return `<span class="badge ${cls}">${text}</span>`; }
+function tierBadge(tier){
+  return `<span class="badge muted" style="background:${TIER_COLOR[tier]}1A;color:${TIER_COLOR[tier]}"><span class="tier-dot" style="background:${TIER_COLOR[tier]}"></span>${tier}</span>`;
+}
+function pbar(value,max,color){
+  const pct = max>0 ? Math.min(100,Math.round(value/max*100)) : 0;
+  return `<div class="pbar"><div style="width:${pct}%;background:${color}"></div></div>`;
+}
+function statusBadge(s){ const m=STATUS_MAP[s]; return m?badge(m.label,m.cls):''; }
+function draftBadge(d){ const m=DRAFT_MAP[d]; return m?badge(m.label,m.cls):'<span class="muted-text">—</span>'; }
+
+/* ===================== BREADCRUMB ===================== */
+function renderBreadcrumb(){
+  const el = document.getElementById('breadcrumb');
+  const crumbs = [];
+  const roleLabel = {brand:'มุมมองแบรนด์',owner:'มุมมองหัวหน้า',staff:'มุมมองพนักงาน'}[state.role];
+  crumbs.push({label: state.role==='brand' ? 'แคมเปญของฉัน' : (state.role==='owner'?'แบรนด์ทั้งหมด':'แบรนด์ของฉัน'), action:()=>go({view:'dashboard',brandId:null,campaignId:null})});
+  if(state.brandId && state.role!=='brand'){
+    crumbs.push({label:getBrand(state.brandId).name, action:()=>go({view:'brand',campaignId:null})});
+  }
+  if(state.campaignId){
+    const b = state.brandId || (state.role==='brand' ? DB.brands[0].id : null);
+    const camp = getCampaign(b,state.campaignId);
+    crumbs.push({label:camp.name, action:null});
+  }
+  el.innerHTML = crumbs.map((c,i)=>{
+    const isLast = i===crumbs.length-1;
+    return (i>0?'<span class="sep">›</span>':'') + `<button class="${isLast?'current':''}" ${c.action?`onclick="(${c.action.toString()})()"`:''}>${c.label}</button>`;
+  }).join('');
+}
+
+/* ===================== ROLE SWITCH ===================== */
+function renderRoleSwitch(){
+  const el = document.getElementById('roleSwitch');
+  const roles = [['brand','มุมมองแบรนด์'],['owner','มุมมองหัวหน้า'],['staff','มุมมองพนักงาน']];
+  el.innerHTML = roles.map(([r,l])=>`<button class="${state.role===r?'active':''}" onclick="go({role:'${r}',view:'dashboard',brandId:null,campaignId:null,tab:'${r==='owner'?'review':'source'}'})">${l}</button>`).join('');
+}
+
+/* ===================== BRAND VIEWS ===================== */
+function renderBrandDashboard(){
+  const brand = DB.brands[0]; // brand user belongs to GlowSkin
+  const allTarget = brand.campaigns.reduce((s,c)=>s+c.target,0);
+  const allSelected = brand.campaigns.reduce((s,c)=>s+totalTier(c,'brandSelected'),0);
+  const allPosted = brand.campaigns.reduce((s,c)=>s+totalTier(c,'posted'),0);
+  return `
+    <h1 class="page-title">สวัสดี, ${brand.name} 👋</h1>
+    <p class="page-sub">ภาพรวมทุกแคมเปญของคุณ และสถานะการคัดเลือก/ลงคอนเทนต์ของอินฟลูเอนเซอร์</p>
+    <div class="grid cols-3" style="margin-bottom:18px;">
+      <div class="stat"><div class="label">แคมเปญทั้งหมด</div><div class="value">${brand.campaigns.length}</div></div>
+      <div class="stat"><div class="label">อินฟลูที่ยืนยันแล้ว (ทุกแคมเปญ)</div><div class="value">${allSelected} <small>/ ${allTarget}</small></div></div>
+      <div class="stat"><div class="label">ลงคลิปแล้วรวม</div><div class="value">${allPosted} <small>/ ${allSelected}</small></div></div>
+    </div>
+    <div class="section-title">แคมเปญของคุณ</div>
+    <div class="grid cols-2">
+      ${brand.campaigns.map(c=>{
+        const target=c.target, selected=totalTier(c,'brandSelected'), posted=totalTier(c,'posted');
+        const pendingForBrand = totalTier(c,'ownerApproved') - selected;
+        return `
+        <div class="camp-card" onclick="go({view:'campaign',brandId:'${brand.id}',campaignId:'${c.id}',tab:'select'})">
+          <div class="top">
+            <div>
+              <h3>${c.name}</h3>
+              <div class="meta">เริ่มลงคลิป ${c.startDate} · ครบกำหนด ${c.deadlineDate}</div>
+            </div>
+            ${pendingForBrand>0?badge(pendingForBrand+' รายชื่อรอคุณตรวจ','warning'):badge(c.status,'primary')}
+          </div>
+          <div class="pbar-row"><span>ยืนยันแล้ว</span><span>${selected} / ${target}</span></div>
+          ${pbar(selected,target,'#4C5FD5')}
+          <div class="pbar-row" style="margin-top:10px;"><span>ลงคลิปแล้ว</span><span>${posted} / ${selected}</span></div>
+          ${pbar(posted,selected,'#1E9E5C')}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderBrandCampaign(){
+  const brand = DB.brands[0];
+  const camp = getCampaign(brand.id, state.campaignId);
+  const target = camp.target, quota=camp.brandQuota, selected = totalTier(camp,'brandSelected');
+  const remaining = Math.max(0, quota-selected);
+
+  return `
+    <h1 class="page-title">${camp.name}</h1>
+    <p class="page-sub">${camp.status} · เริ่มลงคลิป ${camp.startDate} · ครบกำหนด ${camp.deadlineDate} ${camp.briefFile?`· <a class="link" href="#">📎 ดาวน์โหลดบรีฟ (${camp.briefVersion})</a>`:''}</p>
+
+    <div class="tabs">
+      <button class="${state.tab==='select'?'active':''}" onclick="go({tab:'select'})">คัดเลือกอินฟลูเอนเซอร์</button>
+      <button class="${state.tab==='progress'?'active':''}" onclick="go({tab:'progress'})">ความคืบหน้าการลงคลิป</button>
+    </div>
+
+    ${state.tab==='select' ? renderBrandSelectTab(camp) : renderBrandProgressTab(camp)}
+  `;
+}
+
+function renderBrandSelectTab(camp){
+  const target=camp.target, quota=camp.brandQuota;
+  const selected = totalTier(camp,'brandSelected');
+  const submitted = totalTier(camp,'sourced');
+  const remaining = Math.max(0, quota-selected);
+  const candidates = camp.influencers.filter(i=>i.status==='owner_approved' || i.status==='brand_selected');
+
+  return `
+    <div class="note-banner">โควต้าที่คุณสามารถเลือกได้สูงสุด <b>${quota} คน</b> (กำหนดโดยทีม) — ตอนนี้เลือกแล้ว <b id="selCount">${selected}</b> คน เหลือเลือกได้อีก <b id="remCount">${remaining}</b> คน</div>
+
+    <div class="grid cols-4" style="margin-bottom:16px;">
+      <div class="stat pad-sm"><div class="label">ต้องการทั้งหมด</div><div class="value">${target}</div></div>
+      <div class="stat pad-sm"><div class="label">ทีมส่งรายชื่อมาแล้ว</div><div class="value">${submitted}</div></div>
+      <div class="stat pad-sm"><div class="label">หัวหน้าคัดผ่าน (รอคุณเลือก)</div><div class="value">${totalTier(camp,'ownerApproved')}</div></div>
+      <div class="stat pad-sm"><div class="label">คุณคัดเลือกแล้ว</div><div class="value">${selected} <small>/ ${quota}</small></div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-title">สัดส่วนตามระดับอินฟลูเอนเซอร์ <span class="hint">เป้าหมาย vs คัดผ่านแล้ว vs ที่คุณเลือกแล้ว</span></div>
+      <div class="table-wrap"><table>
+        <tr><th>ระดับ</th><th>เป้าหมาย</th><th>หัวหน้าคัดผ่าน</th><th>คุณเลือกแล้ว</th><th style="width:160px">สัดส่วน</th></tr>
+        ${TIERS.map(t=>{
+          const s=camp.tierStats[t];
+          return `<tr>
+            <td>${tierBadge(t)}</td>
+            <td>${s.target}</td>
+            <td>${s.ownerApproved}</td>
+            <td><b>${s.brandSelected}</b></td>
+            <td>${pbar(s.brandSelected,s.target,TIER_COLOR[t])}</td>
+          </tr>`;
+        }).join('')}
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <div class="section-title" style="margin-bottom:0;">รายชื่อรอการคัดเลือก <span class="hint">ติ๊กเพื่อเลือก / ยกเลิกการเลือก</span></div>
+        <button class="btn primary" onclick="alert('ส่งผลการคัดเลือกกลับให้หัวหน้าแล้ว ✅')">ยืนยันรายชื่อที่เลือก</button>
+      </div>
+      <div class="table-wrap"><table>
+        <tr><th></th><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>สถานะ</th></tr>
+        ${candidates.map(i=>`
+          <tr>
+            <td><input type="checkbox" ${i.status==='brand_selected'?'checked':''} onchange="onSelectToggle(this,'${quota}')" data-row></td>
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td class="followers">${i.followers}</td>
+            <td>${statusBadge(i.status)}</td>
+          </tr>`).join('')}
+      </table></div>
+      <div class="muted-text" style="margin-top:10px;">* ตัวอย่างแสดง ${candidates.length} รายชื่อ จากทั้งหมด ${totalTier(camp,'ownerApproved')} รายชื่อที่หัวหน้าคัดผ่านแล้ว</div>
+    </div>
+  `;
+}
+
+function onSelectToggle(el, quota){
+  const checked = document.querySelectorAll('[data-row]:checked').length;
+  const total = document.querySelectorAll('[data-row]').length;
+  document.getElementById('selCount').textContent = checked;
+  document.getElementById('remCount').textContent = Math.max(0, quota-checked);
+  document.querySelectorAll('[data-row]').forEach(cb=>{
+    if(!cb.checked && checked>=quota) cb.disabled = true; else cb.disabled=false;
+  });
+}
+
+function renderBrandProgressTab(camp){
+  const rows = camp.influencers.filter(i=>i.status==='confirmed');
+  return `
+    <div class="card">
+      <div class="section-title">รายชื่อที่ยืนยันแล้ว & สถานะลงคอนเทนต์</div>
+      <div class="table-wrap"><table>
+        <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>วันดีลงาน</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th></tr>
+        ${rows.map(i=>`
+          <tr>
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td>${i.dealDate}</td>
+            <td>${draftBadge(i.draft)}</td>
+            <td>${i.postDate}</td>
+            <td>${i.postLink?`<a class="link" href="#">${i.postLink}</a>`:'<span class="muted-text">—</span>'}</td>
+          </tr>`).join('')}
+      </table></div>
+    </div>
+  `;
+}
+
+/* ===================== OWNER VIEWS ===================== */
+function renderOwnerDashboard(){
+  const allCampaigns = DB.brands.flatMap(b=>b.campaigns.map(c=>({...c,brandName:b.name,brandId:b.id})));
+  const sumTarget = allCampaigns.reduce((s,c)=>s+c.target,0);
+  const sumConfirmed = allCampaigns.reduce((s,c)=>s+totalTier(c,'brandSelected'),0);
+  const sumPosted = allCampaigns.reduce((s,c)=>s+totalTier(c,'posted'),0);
+  const pendingReview = allCampaigns.reduce((s,c)=>s+c.influencers.filter(i=>i.status==='pending_owner').length,0);
+
+  return `
+    <h1 class="page-title">ภาพรวมทั้งหมด</h1>
+    <p class="page-sub">สรุปทุกแบรนด์และแคมเปญที่กำลังดำเนินการ</p>
+    <div class="grid cols-4" style="margin-bottom:18px;">
+      <div class="stat"><div class="label">แบรนด์ที่ดูแล</div><div class="value">${DB.brands.length}</div></div>
+      <div class="stat"><div class="label">แคมเปญทั้งหมด</div><div class="value">${allCampaigns.length}</div></div>
+      <div class="stat"><div class="label">อินฟลูยืนยันแล้ว / เป้า</div><div class="value">${sumConfirmed} <small>/ ${sumTarget}</small></div></div>
+      <div class="stat"><div class="label">รอตรวจจากทีม</div><div class="value" style="color:var(--warning)">${pendingReview}</div></div>
+    </div>
+    <div class="section-title">รายชื่อแบรนด์</div>
+    <div class="grid cols-2">
+      ${DB.brands.map(b=>{
+        const t = b.campaigns.reduce((s,c)=>s+c.target,0);
+        const sel = b.campaigns.reduce((s,c)=>s+totalTier(c,'brandSelected'),0);
+        const pend = b.campaigns.reduce((s,c)=>s+c.influencers.filter(i=>i.status==='pending_owner').length,0);
+        return `
+        <div class="camp-card" onclick="go({view:'brand',brandId:'${b.id}'})">
+          <div class="top">
+            <div>
+              <h3>${b.name}</h3>
+              <div class="meta">${b.campaigns.length} แคมเปญ</div>
+            </div>
+            ${pend>0?badge(pend+' รอตรวจ','warning'):badge('อัปเดตล่าสุด','muted')}
+          </div>
+          <div class="pbar-row"><span>ยืนยันแล้ว</span><span>${sel} / ${t}</span></div>
+          ${pbar(sel,t,'#4C5FD5')}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderOwnerBrand(){
+  const brand = getBrand(state.brandId);
+  return `
+    <div class="flex-between">
+      <div>
+        <h1 class="page-title">${brand.name}</h1>
+        <p class="page-sub">แคมเปญทั้งหมดของแบรนด์นี้</p>
+      </div>
+      <button class="btn primary" onclick="alert('เปิดฟอร์มสร้างแคมเปญใหม่ + อัปโหลดบรีฟ')">+ สร้างแคมเปญใหม่</button>
+    </div>
+    <div class="grid cols-2">
+      ${brand.campaigns.map(c=>{
+        const target=c.target, confirmed=totalTier(c,'brandSelected'), posted=totalTier(c,'posted');
+        const pending = c.influencers.filter(i=>i.status==='pending_owner').length;
+        return `
+        <div class="camp-card" onclick="go({view:'campaign',campaignId:'${c.id}',tab:'review'})">
+          <div class="top">
+            <div>
+              <h3>${c.name}</h3>
+              <div class="meta">เริ่มลงคลิป ${c.startDate} · ครบกำหนด ${c.deadlineDate}</div>
+            </div>
+            ${pending>0?badge(pending+' รอตรวจ','warning'):badge(c.status,'primary')}
+          </div>
+          <div class="pbar-row"><span>ยืนยันแล้ว / เป้า</span><span>${confirmed} / ${target}</span></div>
+          ${pbar(confirmed,target,'#4C5FD5')}
+          <div class="pbar-row" style="margin-top:10px;"><span>ลงคลิปแล้ว</span><span>${posted} / ${confirmed}</span></div>
+          ${pbar(posted,confirmed,'#1E9E5C')}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderOwnerCampaign(){
+  const brand = getBrand(state.brandId);
+  const camp = getCampaign(brand.id, state.campaignId);
+
+  return `
+    <h1 class="page-title">${camp.name}</h1>
+    <p class="page-sub">${brand.name} · ${camp.status} · เริ่มลงคลิป ${camp.startDate} · ครบกำหนด ${camp.deadlineDate}</p>
+
+    <div class="tabs">
+      <button class="${state.tab==='review'?'active':''}" onclick="go({tab:'review'})">ตรวจรายชื่อจากทีม</button>
+      <button class="${state.tab==='setup'?'active':''}" onclick="go({tab:'setup'})">บรีฟ & เป้าหมาย</button>
+      <button class="${state.tab==='prod'?'active':''}" onclick="go({tab:'prod'})">ภาพรวมการผลิตคอนเทนต์</button>
+    </div>
+
+    ${state.tab==='review' ? renderOwnerReviewTab(camp)
+      : state.tab==='setup' ? renderOwnerSetupTab(camp)
+      : renderOwnerProdTab(camp)}
+  `;
+}
+
+function renderOwnerReviewTab(camp){
+  const pending = camp.influencers.filter(i=>i.status==='pending_owner');
+  const approvedWaitingBrand = camp.influencers.filter(i=>i.status==='owner_approved');
+  const selectedByBrand = camp.influencers.filter(i=>i.status==='brand_selected');
+
+  return `
+    <div class="grid cols-4" style="margin-bottom:16px;">
+      <div class="stat pad-sm"><div class="label">เป้าหมายรวม</div><div class="value">${camp.target}</div></div>
+      <div class="stat pad-sm"><div class="label">ทีมส่งมาแล้ว</div><div class="value">${totalTier(camp,'sourced')}</div></div>
+      <div class="stat pad-sm"><div class="label">ส่งให้แบรนด์แล้ว</div><div class="value">${totalTier(camp,'ownerApproved')}</div></div>
+      <div class="stat pad-sm"><div class="label">แบรนด์ยืนยันแล้ว</div><div class="value">${totalTier(camp,'brandSelected')} <small>/ ${camp.brandQuota}</small></div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <div class="section-title" style="margin-bottom:0;">รายชื่อใหม่จากทีม — รอการตรวจสอบ</div>
+        ${pending.length>0?`<button class="btn primary" onclick="alert('ส่งรายชื่อที่อนุมัติทั้งหมดให้แบรนด์แล้ว ✅')">ส่งที่อนุมัติให้แบรนด์</button>`:''}
+      </div>
+      ${pending.length===0? emptyState('🎉','ไม่มีรายชื่อรอตรวจ','ทีมยังไม่ส่งรายชื่อใหม่เข้ามาในขณะนี้') : `
+      <div class="table-wrap"><table>
+        <tr><th></th><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th style="width:170px">การตัดสิน</th></tr>
+        ${pending.map(i=>`
+          <tr>
+            <td></td>
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td class="followers">${i.followers}</td>
+            <td>${i.addedBy}</td>
+            <td>
+              <button class="btn sm primary" onclick="alert('คัดผ่าน → ส่งให้แบรนด์')">คัดผ่าน</button>
+              <button class="btn sm secondary" onclick="alert('คัดออก')">คัดออก</button>
+            </td>
+          </tr>`).join('')}
+      </table></div>`}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-title">ส่งให้แบรนด์แล้ว — รอแบรนด์เลือก (${approvedWaitingBrand.length})</div>
+      <div class="table-wrap"><table>
+        <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th>สถานะ</th></tr>
+        ${approvedWaitingBrand.map(i=>`
+          <tr>
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td class="followers">${i.followers}</td>
+            <td>${i.addedBy}</td>
+            <td>${statusBadge(i.status)}</td>
+          </tr>`).join('')}
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <div class="section-title" style="margin-bottom:0;">แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})</div>
+        ${selectedByBrand.length>0?`<button class="btn primary" onclick="alert('ยืนยันรายชื่อสุดท้าย และแจ้งทีมให้เริ่มงาน + ส่งสินค้า ✅')">ยืนยัน & แจ้งทีม</button>`:''}
+      </div>
+      <div class="table-wrap"><table>
+        <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th>สถานะ</th></tr>
+        ${selectedByBrand.map(i=>`
+          <tr>
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td class="followers">${i.followers}</td>
+            <td>${i.addedBy}</td>
+            <td>${statusBadge(i.status)}</td>
+          </tr>`).join('')}
+      </table></div>
+    </div>
+  `;
+}
+
+function renderOwnerSetupTab(camp){
+  return `
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="section-title">ไฟล์บรีฟ</div>
+        ${camp.briefFile? `
+          <div class="flex-between" style="margin-bottom:10px;">
+            <div>
+              <div class="cell-name">📎 ${camp.briefFile}</div>
+              <div class="cell-sub">เวอร์ชัน ${camp.briefVersion} · อัปโหลดเมื่อ ${camp.briefDate}</div>
+            </div>
+            <a class="link" href="#">ดาวน์โหลด</a>
+          </div>
+        ` : emptyState('📄','ยังไม่มีไฟล์บรีฟ','อัปโหลดบรีฟเพื่อให้ทีมเริ่มหาอินฟลูได้')}
+        <button class="btn secondary" onclick="alert('เปิดหน้าต่างอัปโหลดบรีฟใหม่ (จะถูกบันทึกเป็นเวอร์ชันใหม่ ประวัติเก่ายังเก็บไว้)')">${camp.briefFile?'อัปโหลดบรีฟเวอร์ชันใหม่':'อัปโหลดบรีฟ'}</button>
+      </div>
+      <div class="card">
+        <div class="section-title">เป้าหมาย & โควต้าการคัดเลือก</div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>จำนวนอินฟลูที่ต้องการทั้งหมด</label>
+          <input type="number" value="${camp.target}">
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>โควต้าที่แบรนด์เลือกได้สูงสุด</label>
+          <input type="number" value="${camp.brandQuota}">
+        </div>
+        <button class="btn primary" onclick="alert('บันทึกการตั้งค่าแล้ว')">บันทึก</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <div class="section-title">เป้าหมายแยกตามระดับอินฟลูเอนเซอร์</div>
+      <div class="grid cols-5">
+        ${TIERS.map(t=>`
+          <div class="field">
+            <label>${t}</label>
+            <input type="number" value="${camp.tierStats[t].target}">
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderOwnerProdTab(camp){
+  const rows = camp.influencers.filter(i=>i.status==='confirmed');
+  const counts = {waiting:0,review:0,revise:0,approved:0,posted:0};
+  rows.forEach(r=>counts[r.draft]++);
+  return `
+    <div class="grid cols-5" style="margin-bottom:16px;">
+      <div class="stat pad-sm"><div class="label">${DRAFT_MAP.waiting.label}</div><div class="value">${counts.waiting}</div></div>
+      <div class="stat pad-sm"><div class="label">${DRAFT_MAP.review.label}</div><div class="value" style="color:var(--warning)">${counts.review}</div></div>
+      <div class="stat pad-sm"><div class="label">${DRAFT_MAP.revise.label}</div><div class="value" style="color:var(--danger)">${counts.revise}</div></div>
+      <div class="stat pad-sm"><div class="label">${DRAFT_MAP.approved.label}</div><div class="value">${counts.approved}</div></div>
+      <div class="stat pad-sm"><div class="label">${DRAFT_MAP.posted.label}</div><div class="value" style="color:var(--success)">${counts.posted}</div></div>
+    </div>
+    <div class="card">
+      <div class="section-title">รายการอินฟลูที่กำลังผลิตคอนเทนต์</div>
+      <div class="table-wrap"><table>
+        <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ดูแล</th><th>วันดีลงาน</th><th>สถานะ</th><th>วันที่ลง</th><th>ลิงก์</th></tr>
+        ${rows.map(i=>`
+          <tr>
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td>${i.addedBy}</td>
+            <td>${i.dealDate}</td>
+            <td>${draftBadge(i.draft)}</td>
+            <td>${i.postDate}</td>
+            <td>${i.postLink?`<a class="link" href="#">${i.postLink}</a>`:'<span class="muted-text">—</span>'}</td>
+          </tr>`).join('')}
+      </table></div>
+    </div>
+  `;
+}
+
+/* ===================== STAFF VIEWS ===================== */
+function renderStaffDashboard(){
+  const allCampaigns = DB.brands.flatMap(b=>b.campaigns.map(c=>({...c,brandName:b.name,brandId:b.id})));
+  const sumFound = allCampaigns.reduce((s,c)=>s+totalTier(c,'sourced'),0);
+  const sumTarget = allCampaigns.reduce((s,c)=>s+c.target,0);
+  return `
+    <h1 class="page-title">งานของฉัน</h1>
+    <p class="page-sub">เลือกแบรนด์เพื่อดูแคมเปญและบรีฟที่ต้องหาอินฟลู</p>
+    <div class="grid cols-3" style="margin-bottom:18px;">
+      <div class="stat"><div class="label">แบรนด์ที่ดูแล</div><div class="value">${DB.brands.length}</div></div>
+      <div class="stat"><div class="label">แคมเปญทั้งหมด</div><div class="value">${allCampaigns.length}</div></div>
+      <div class="stat"><div class="label">หาได้แล้ว / เป้ารวม</div><div class="value">${sumFound} <small>/ ${sumTarget}</small></div></div>
+    </div>
+    <div class="grid cols-2">
+      ${DB.brands.map(b=>{
+        const found = b.campaigns.reduce((s,c)=>s+totalTier(c,'sourced'),0);
+        const target = b.campaigns.reduce((s,c)=>s+c.target,0);
+        return `
+        <div class="camp-card" onclick="go({view:'brand',brandId:'${b.id}'})">
+          <div class="top">
+            <div>
+              <h3>${b.name}</h3>
+              <div class="meta">${b.campaigns.length} แคมเปญ / บรีฟ</div>
+            </div>
+          </div>
+          <div class="pbar-row"><span>หาได้แล้ว</span><span>${found} / ${target}</span></div>
+          ${pbar(found,target,'#4C5FD5')}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderStaffBrand(){
+  const brand = getBrand(state.brandId);
+  return `
+    <h1 class="page-title">${brand.name}</h1>
+    <p class="page-sub">บรีฟ/แคมเปญทั้งหมดของแบรนด์นี้</p>
+    <div class="grid cols-2">
+      ${brand.campaigns.map(c=>{
+        const found=totalTier(c,'sourced'), target=c.target;
+        return `
+        <div class="camp-card" onclick="go({view:'campaign',campaignId:'${c.id}',tab:'source'})">
+          <div class="top">
+            <div>
+              <h3>${c.name}</h3>
+              <div class="meta">${c.briefFile?('📎 '+c.briefFile):'ยังไม่มีไฟล์บรีฟ'}</div>
+            </div>
+            ${badge(c.status,'primary')}
+          </div>
+          <div class="pbar-row"><span>หาได้แล้ว</span><span>${found} / ${target}</span></div>
+          ${pbar(found,target,'#4C5FD5')}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderStaffCampaign(){
+  const brand = getBrand(state.brandId);
+  const camp = getCampaign(brand.id, state.campaignId);
+  return `
+    <h1 class="page-title">${camp.name}</h1>
+    <p class="page-sub">${brand.name} · ${camp.status} ${camp.briefFile?`· <a class="link" href="#">📎 ดาวน์โหลดบรีฟ (${camp.briefVersion})</a>`:'· ยังไม่มีไฟล์บรีฟ'}</p>
+
+    <div class="tabs">
+      <button class="${state.tab==='source'?'active':''}" onclick="go({tab:'source'})">หาอินฟลูเอนเซอร์</button>
+      <button class="${state.tab==='track'?'active':''}" onclick="go({tab:'track'})">ติดตามงาน / อัปเดตคอนเทนต์</button>
+    </div>
+
+    ${state.tab==='source' ? renderStaffSourceTab(camp) : renderStaffTrackTab(camp)}
+  `;
+}
+
+function renderStaffSourceTab(camp){
+  if(camp.influencers.length===0 && !camp.briefFile){
+    return emptyState('📄','ยังไม่มีบรีฟสำหรับแคมเปญนี้','รอหัวหน้าอัปโหลดไฟล์บรีฟและตั้งเป้าหมายก่อนเริ่มหาอินฟลูเอนเซอร์');
+  }
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-title">เป้าหมายแยกตามระดับ <span class="hint">หาได้แล้ว / เป้าหมาย</span></div>
+      <div class="grid cols-5">
+        ${TIERS.map(t=>{
+          const s=camp.tierStats[t];
+          return `<div>
+            <div class="pbar-row">${tierBadge(t)}<span>${s.sourced} / ${s.target}</span></div>
+            ${pbar(s.sourced,s.target,TIER_COLOR[t])}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-title">เพิ่มอินฟลูเอนเซอร์ใหม่</div>
+      <div class="dup-banner">⚠️ ระบบจะแจ้งเตือนหากลิงก์ช่องทางนี้มีคนในทีมเพิ่มไว้แล้ว เพื่อป้องกันการคัดซ้ำ</div>
+      <div class="grid cols-4">
+        <div class="field"><label>ชื่ออินฟลูเอนเซอร์</label><input type="text" placeholder="เช่น Beauty by Ploy"></div>
+        <div class="field"><label>ลิงก์ช่องทาง</label><input type="text" placeholder="วางลิงก์ IG / TikTok / YouTube"></div>
+        <div class="field"><label>ระดับ</label><select>${TIERS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>วันที่ดีลงานสำเร็จ</label><input type="date"></div>
+      </div>
+      <button class="btn primary" style="margin-top:12px;" onclick="alert('เพิ่มรายชื่อแล้ว — สถานะ: รอหัวหน้าตรวจ')">+ เพิ่มรายชื่อ</button>
+    </div>
+
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <div class="section-title" style="margin-bottom:0;">รายชื่อที่ทีมหามาแล้ว (${camp.influencers.length})</div>
+        <button class="btn primary" onclick="alert('ส่งรายชื่อทั้งหมดให้หัวหน้าตรวจแล้ว ✅')">ส่งให้หัวหน้าตรวจ</button>
+      </div>
+      <div class="table-wrap"><table>
+        <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th><th>วันดีลงาน</th><th>สถานะ</th></tr>
+        ${camp.influencers.map(i=>{
+          const isMine = i.addedBy===CURRENT_STAFF;
+          return `
+          <tr class="${isMine?'':'row-muted'}">
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td class="followers">${i.followers}</td>
+            <td>${i.addedBy}${isMine?' <span class="cell-sub">(ของฉัน)</span>':''}</td>
+            <td>${i.dealDate}</td>
+            <td>${statusBadge(i.status)}</td>
+          </tr>`;
+        }).join('')}
+      </table></div>
+      <div class="muted-text" style="margin-top:10px;">* แถวสีจางคือรายชื่อที่เพื่อนในทีมเพิ่มไว้ — ดูได้อย่างเดียว แก้ไขไม่ได้ เพื่อป้องกันข้อมูลชนกัน</div>
+    </div>
+  `;
+}
+
+function renderStaffTrackTab(camp){
+  const rows = camp.influencers.filter(i=>i.status==='confirmed');
+  if(rows.length===0) return emptyState('🚚','ยังไม่มีรายชื่อที่ถูกยืนยัน','เมื่อหัวหน้ายืนยันรายชื่อสุดท้ายจากแบรนด์ รายชื่อจะมาแสดงที่นี่เพื่อให้อัปเดตงานได้');
+  return `
+    <div class="note-banner">อัปเดตสถานะของแต่ละคนทุกวันจนกว่าจะลงคลิปครบ — หัวหน้าจะเห็นการอัปเดตนี้แบบเรียลไทม์</div>
+    <div class="card">
+      <div class="table-wrap"><table>
+        <tr><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>วันดีลงาน</th><th>ส่งสินค้าแล้ว</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th></tr>
+        ${rows.map(i=>`
+          <tr>
+            <td><div class="cell-name">${i.name}</div><div class="cell-sub">${i.channel}</div></td>
+            <td>${tierBadge(i.tier)}</td>
+            <td>${i.dealDate}</td>
+            <td><input type="checkbox" ${i.draft!=='waiting'?'checked':''}></td>
+            <td>
+              <select class="draft-select">
+                ${Object.entries(DRAFT_MAP).map(([k,v])=>`<option value="${k}" ${k===i.draft?'selected':''}>${v.label}</option>`).join('')}
+              </select>
+            </td>
+            <td><input type="date" value="${i.draft==='posted'?'2026-07-05':''}" style="border:1px solid var(--border);border-radius:8px;padding:6px;font-size:12px;"></td>
+            <td><input type="text" placeholder="วางลิงก์คลิปที่นี่" value="${i.postLink}" style="border:1px solid var(--border);border-radius:8px;padding:6px;font-size:12px;width:160px;"></td>
+          </tr>`).join('')}
+      </table></div>
+      <button class="btn primary" style="margin-top:14px;" onclick="alert('บันทึกการอัปเดตแล้ว')">บันทึกการอัปเดต</button>
+    </div>
+  `;
+}
+
+/* ===================== EMPTY STATE ===================== */
+function emptyState(icon,title,desc){
+  return `<div class="card"><div class="empty"><div class="icon">${icon}</div><div class="title">${title}</div><div>${desc}</div></div></div>`;
+}
+
+/* ===================== MAIN RENDER ===================== */
+function render(){
+  renderRoleSwitch();
+  renderBreadcrumb();
+  const el = document.getElementById('content');
+  if(state.role==='brand'){
+    if(state.view==='dashboard') el.innerHTML = renderBrandDashboard();
+    else el.innerHTML = renderBrandCampaign();
+  } else if(state.role==='owner'){
+    if(state.view==='dashboard') el.innerHTML = renderOwnerDashboard();
+    else if(state.view==='brand') el.innerHTML = renderOwnerBrand();
+    else el.innerHTML = renderOwnerCampaign();
+  } else {
+    if(state.view==='dashboard') el.innerHTML = renderStaffDashboard();
+    else if(state.view==='brand') el.innerHTML = renderStaffBrand();
+    else el.innerHTML = renderStaffCampaign();
+  }
+}
+
+render();
+</script>
+</body>
+</html>
