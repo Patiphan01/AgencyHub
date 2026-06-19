@@ -6,5 +6,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     allowedHosts: ['unswabbed-soaringly-jonna.ngrok-free.dev'],
+    proxy: {
+      '/api': 'http://localhost:3001',
+    },
   },
 })

@@ -1,0 +1,10 @@
+{
+  "name": "agencyhub",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "backend:dev": "node backend/server.js",
+    "frontend:dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm install && npm run build"
+  }
+}
