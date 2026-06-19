@@ -11,6 +11,7 @@ import {
   tasks,
   tierTargets,
 } from '../../frontend/src/mock/agencyData.js'
+import { getDatabaseStatus, getRowById, hasDatabaseUrl, listRows } from './db.js'
 
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -36,6 +37,7 @@ function findById(items, id) {
 const apiEndpoints = [
   'GET /api',
   'GET /api/health',
+  'GET /api/db-status',
   'GET /api/mock-data',
   'GET /api/roles',
   'GET /api/brands',
@@ -51,6 +53,19 @@ const apiEndpoints = [
   'GET /api/draft-statuses',
   'GET /api/current-staff',
 ]
+
+const dbTables = {
+  activities: 'activities',
+  brands: 'brands',
+  campaigns: 'campaigns',
+  influencers: 'influencers',
+  notifications: 'notifications',
+  roles: 'roles',
+  tasks: 'tasks',
+  'tier-targets': 'tier_targets',
+  'brief-versions': 'brief_versions',
+  'draft-statuses': 'draft_statuses',
+}
 
 export async function handleApiRequest(req, res) {
   try {
@@ -85,6 +100,10 @@ export async function handleApiRequest(req, res) {
       return sendJson(res, 200, { status: 'ok' })
     }
 
+    if (resource === 'db-status') {
+      return sendJson(res, 200, await getDatabaseStatus())
+    }
+
     const collections = {
       activities,
       brands,
@@ -116,6 +135,25 @@ export async function handleApiRequest(req, res) {
     }
 
     if (Object.hasOwn(collections, resource)) {
+      if (hasDatabaseUrl() && Object.hasOwn(dbTables, resource)) {
+        const tableName = dbTables[resource]
+
+        if (id) {
+          const row = await getRowById(tableName, id)
+
+          if (!row) {
+            return sendJson(res, 404, {
+              error: 'not_found',
+              message: `No ${resource} item found for id "${id}".`,
+            })
+          }
+
+          return sendJson(res, 200, row)
+        }
+
+        return sendJson(res, 200, await listRows(tableName))
+      }
+
       const collection = collections[resource]
 
       if (id) {

@@ -2,7 +2,7 @@
 
 Minimal Node.js backend for AgencyHub.
 
-This backend currently has no database connection, ORM, authentication, or secret-dependent integrations. Database information discovered from the existing frontend mockup is documented in `designdata.ts`.
+This backend supports Postgres through `DATABASE_URL`. If `DATABASE_URL` is not configured yet, read endpoints fall back to the current frontend mock seed data so the API stays testable during setup.
 
 ## Run Locally
 
@@ -24,6 +24,7 @@ The backend defaults to `http://localhost:3001`.
 
 - `GET /api` returns the API status and endpoint list
 - `GET /api/health` returns `{ "status": "ok" }`
+- `GET /api/db-status` returns database configuration/connection status
 - `GET /api/mock-data` returns all current mock-backed data collections
 - `GET /api/roles`
 - `GET /api/brands`
@@ -42,6 +43,8 @@ The backend defaults to `http://localhost:3001`.
 ## Environment
 
 Copy `.env.example` values into your deployment environment as needed. Do not commit real API keys, database URLs, secrets, or credentials.
+
+Recommended database: Neon Postgres via the Vercel Marketplace. Run the SQL files in `backend/db` to create and seed the database.
 
 ## Vercel
 
