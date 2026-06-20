@@ -88,6 +88,13 @@ export function createCampaign(values) {
   })
 }
 
+export function updateCampaign(id, values) {
+  return sendJson(`/api/campaigns/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(values),
+  })
+}
+
 export function getInfluencers() {
   return getJson('/api/influencers')
 }

@@ -1756,6 +1756,8 @@ button {
 
 .agency-mockup .modal {
   width: min(520px, 90vw);
+  max-height: min(86vh, 760px);
+  overflow-y: auto;
   border-radius: 16px;
   background: var(--card);
   padding: 24px;

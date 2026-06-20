@@ -341,6 +341,46 @@ export async function createCampaign(values) {
   })
 }
 
+export async function updateCampaign(id, values) {
+  const sql = await getSql()
+  if (!sql) return null
+
+  const allowedFields = {
+    name: 'name',
+    objective: 'objective',
+    status: 'status',
+    target: 'target',
+    influencerTarget: 'influencer_target',
+    brandQuota: 'brand_quota',
+    startDate: 'start_date',
+    deadlineDate: 'deadline_date',
+    dueDate: 'due_date',
+    budget: 'budget',
+    briefFile: 'brief_file',
+    briefVersion: 'brief_version',
+    briefDate: 'brief_date',
+  }
+
+  const updates = Object.entries(values)
+    .filter(([key]) => Object.hasOwn(allowedFields, key))
+    .map(([key, value]) => ({ column: allowedFields[key], value }))
+
+  if (!updates.length) {
+    const rows = await sql`select * from campaigns where id = ${id} limit 1`
+    return rows[0] || null
+  }
+
+  const updateObject = Object.fromEntries(updates.map(({ column, value }) => [column, value]))
+  const rows = await sql`
+    update campaigns
+    set ${sql(updateObject)}, updated_at = now()
+    where id = ${id}
+    returning *
+  `
+
+  return rows[0] || null
+}
+
 export async function createInfluencer(values) {
   const sql = await getSql()
   if (!sql) return null

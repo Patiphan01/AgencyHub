@@ -11,7 +11,7 @@ import {
   tasks,
   tierTargets,
 } from '../../frontend/src/mock/agencyData.js'
-import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardRows, getDatabaseStatus, getRowById, hasDatabaseUrl, listRows, updateInfluencer } from './db.js'
+import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardRows, getDatabaseStatus, getRowById, hasDatabaseUrl, listRows, updateCampaign, updateInfluencer } from './db.js'
 
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -56,6 +56,7 @@ const apiEndpoints = [
   'POST /api/brands',
   'DELETE /api/brands/:id',
   'POST /api/campaigns',
+  'PATCH /api/campaigns/:id',
   'POST /api/influencers',
   'PATCH /api/influencers/:id',
 ]
@@ -295,6 +296,27 @@ export async function handleApiRequest(req, res) {
       const body = await readJsonBody(req)
       const created = await createCampaign(body)
       return sendJson(res, 201, camelizeRow(created))
+    }
+
+    if (req.method === 'PATCH' && resource === 'campaigns' && id) {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to persist campaign updates.',
+        })
+      }
+
+      const body = await readJsonBody(req)
+      const updated = await updateCampaign(id, body)
+
+      if (!updated) {
+        return sendJson(res, 404, {
+          error: 'not_found',
+          message: `No campaigns item found for id "${id}".`,
+        })
+      }
+
+      return sendJson(res, 200, camelizeRow(updated))
     }
 
     if (req.method === 'POST' && resource === 'influencers') {

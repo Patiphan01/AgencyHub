@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardData, updateInfluencer } from '../services/apiClient'
+import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardData, updateCampaign, updateInfluencer } from '../services/apiClient'
 
 const TIERS = ['Nano', 'Micro', 'Mid', 'Macro', 'Mega']
 const TIER_COLOR = {
@@ -664,7 +664,7 @@ function OwnerCampaign({ brand, campaign, state, go, openModal, refreshDashboard
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">{brand.name} · {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}</p>
       <Tabs tabs={[['review', 'ตรวจรายชื่อจากทีม'], ['setup', 'บรีฟ & เป้าหมาย'], ['prod', 'ภาพรวมการผลิตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
-      {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} refreshDashboardData={refreshDashboardData} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} openModal={openModal} /> : <OwnerProductionTab campaign={campaign} />}
+      {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} refreshDashboardData={refreshDashboardData} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} openModal={openModal} refreshDashboardData={refreshDashboardData} /> : <OwnerProductionTab campaign={campaign} />}
     </>
   )
 }
@@ -718,10 +718,54 @@ function OwnerReviewTab({ campaign, refreshDashboardData }) {
   )
 }
 
-function OwnerSetupTab({ campaign, openModal }) {
+function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
   const db = useDashboardData()
+  const [savingBrief, setSavingBrief] = useState(false)
+
+  async function handleBriefSubmit(event) {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const file = formData.get('briefFileUpload')
+    const briefUrl = String(formData.get('briefUrl') || '').trim()
+    const briefFile = file?.name || briefUrl
+
+    if (!briefFile) {
+      alert('กรุณาเลือกไฟล์บรีฟ หรือใส่ Google Doc / URL')
+      return
+    }
+
+    const currentVersion = Number(String(campaign.briefVersion || 'v0').replace(/\D/g, '')) || 0
+
+    try {
+      setSavingBrief(true)
+      await updateCampaign(campaign.id, {
+        briefFile,
+        briefVersion: `v${currentVersion + 1}`,
+        briefDate: new Date().toISOString().slice(0, 10),
+      })
+      await refreshDashboardData()
+    } catch (error) {
+      alert(`ยังบันทึกบรีฟไม่ได้: ${error.message}`)
+    } finally {
+      setSavingBrief(false)
+    }
+  }
+
   return (
     <>
+      <div className="card block-gap">
+        <div className="section-title">บรีฟแคมเปญ</div>
+        <form className="block-gap" onSubmit={handleBriefSubmit}>
+          <div className="grid cols-2 block-gap">
+            <div className="field">
+              <label>ไฟล์บรีฟ (.txt, .doc, .docx)</label>
+              <input accept=".txt,.doc,.docx,.pdf" name="briefFileUpload" type="file" />
+            </div>
+            <Field label="Google Doc / URL บรีฟ" name="briefUrl" placeholder="https://docs.google.com/..." type="url" />
+          </div>
+          <button className="btn secondary" disabled={savingBrief} type="submit">{savingBrief ? 'กำลังบันทึก...' : campaign.briefFile ? 'บันทึกบรีฟเวอร์ชันใหม่' : 'บันทึกบรีฟ'}</button>
+        </form>
+      </div>
       <div className="grid cols-2">
         <div className="card">
           <div className="section-title">ไฟล์บรีฟ</div>
@@ -893,12 +937,15 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
     }
   }
 
-  if (campaign.influencers.length === 0 && !campaign.briefFile) {
+  if (false && campaign.influencers.length === 0 && !campaign.briefFile) {
     return <EmptyState icon="เอกสาร" title="ยังไม่มีบรีฟสำหรับแคมเปญนี้" desc="รอหัวหน้าอัปโหลดไฟล์บรีฟและตั้งเป้าหมายก่อนเริ่มหาอินฟลูเอนเซอร์" />
   }
 
   return (
     <>
+      {!campaign.briefFile ? (
+        <div className="note-banner">ยังไม่มีบรีฟในแคมเปญนี้ แต่พนักงานสามารถเพิ่มรายชื่อรอหัวหน้าตรวจได้เลย</div>
+      ) : null}
       <div className="card block-gap">
         <div className="section-title">เป้าหมายแยกตามระดับ <span className="hint">หาได้แล้ว / เป้าหมาย</span></div>
         <div className="grid cols-5">
@@ -1254,6 +1301,9 @@ function MockupModal({ type, context, onClose, onSaved }) {
     try {
       setSaving(true)
       if (isCampaign) {
+        const briefUpload = formData.get('briefFileUpload')
+        const briefFile = briefUpload?.name || formData.get('briefFile')
+
         await createCampaign({
           brandId: context.brand.id,
           name: formData.get('name'),
@@ -1262,8 +1312,8 @@ function MockupModal({ type, context, onClose, onSaved }) {
           brandQuota: formData.get('brandQuota'),
           startDate: formData.get('startDate'),
           deadlineDate: formData.get('deadlineDate'),
-          briefFile: formData.get('briefFile'),
-          briefDate: formData.get('briefFile') ? new Date().toISOString().slice(0, 10) : null,
+          briefFile,
+          briefDate: briefFile ? new Date().toISOString().slice(0, 10) : null,
           tierTargets: {
             Nano: formData.get('tierNano'),
             Micro: formData.get('tierMicro'),
@@ -1317,6 +1367,13 @@ function MockupModal({ type, context, onClose, onSaved }) {
               <Field label="วันครบกำหนด" name="deadlineDate" type="date" />
             </div>
             <div className="modal-field"><Field label="ชื่อไฟล์บรีฟ / URL บรีฟ" name="briefFile" placeholder="เช่น brief.pdf หรือ https://..." /></div>
+            <div className="grid cols-2 block-gap">
+              <div className="field">
+                <label>ไฟล์บรีฟ (.txt, .doc, .docx)</label>
+                <input accept=".txt,.doc,.docx,.pdf" name="briefFileUpload" type="file" />
+              </div>
+              <Field label="Google Doc / URL บรีฟ" name="briefFile" placeholder="https://docs.google.com/..." type="url" />
+            </div>
             <div className="grid cols-5">
               <Field label="Nano" name="tierNano" type="number" value="0" />
               <Field label="Micro" name="tierMicro" type="number" value="0" />
