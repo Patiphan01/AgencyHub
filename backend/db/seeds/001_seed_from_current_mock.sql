@@ -48,15 +48,16 @@ on conflict (id) do update set
   updated_at = now();
 
 insert into influencers (
-  id, name, channel, tier, followers, added_by, deal_date, status,
+  id, campaign_id, name, channel, tier, followers, added_by, deal_date, status,
   draft_status, product_sent, post_date, post_link
 ) values
-  ('inf-001', 'Nara Narin', 'tiktok.com/@naranarin', 'Macro', '825K', 'Staff A', '05 มิ.ย. 2026', 'Confirmed', 'Draft approved', true, '18 มิ.ย. 2026', 'https://tiktok.com/@naranarin/video/001'),
-  ('inf-002', 'Beam Eats', 'instagram.com/beameats', 'Mid', '212K', 'Staff B', '06 มิ.ย. 2026', 'Brand selected', 'Waiting draft', false, '22 มิ.ย. 2026', '-'),
-  ('inf-003', 'Ploy Routine', 'youtube.com/@ployroutine', 'Micro', '74K', 'Staff A', '08 มิ.ย. 2026', 'Owner approved', 'Draft submitted', true, '24 มิ.ย. 2026', '-'),
-  ('inf-004', 'Krit Lens', 'instagram.com/kritlens', 'Mega/KOL', '1.4M', 'Staff B', '10 มิ.ย. 2026', 'Waiting owner review', 'Waiting draft', false, '28 มิ.ย. 2026', '-'),
-  ('inf-005', 'Mild Mini', 'tiktok.com/@mildmini', 'Nano', '18K', 'Staff A', '11 มิ.ย. 2026', 'Posted', 'Posted', true, '15 มิ.ย. 2026', 'https://tiktok.com/@mildmini/video/005')
+  ('inf-001', 'glowhaus-summer', 'Nara Narin', 'tiktok.com/@naranarin', 'Macro', '825K', 'Staff A', '05 มิ.ย. 2026', 'Confirmed', 'Draft approved', true, '18 มิ.ย. 2026', 'https://tiktok.com/@naranarin/video/001'),
+  ('inf-002', 'glowhaus-summer', 'Beam Eats', 'instagram.com/beameats', 'Mid', '212K', 'Staff B', '06 มิ.ย. 2026', 'Brand selected', 'Waiting draft', false, '22 มิ.ย. 2026', '-'),
+  ('inf-003', 'glowhaus-summer', 'Ploy Routine', 'youtube.com/@ployroutine', 'Micro', '74K', 'Staff A', '08 มิ.ย. 2026', 'Owner approved', 'Draft submitted', true, '24 มิ.ย. 2026', '-'),
+  ('inf-004', 'urbanbite-review', 'Krit Lens', 'instagram.com/kritlens', 'Mega/KOL', '1.4M', 'Staff B', '10 มิ.ย. 2026', 'Waiting owner review', 'Waiting draft', false, '28 มิ.ย. 2026', '-'),
+  ('inf-005', 'fitloop-reset', 'Mild Mini', 'tiktok.com/@mildmini', 'Nano', '18K', 'Staff A', '11 มิ.ย. 2026', 'Posted', 'Posted', true, '15 มิ.ย. 2026', 'https://tiktok.com/@mildmini/video/005')
 on conflict (id) do update set
+  campaign_id = excluded.campaign_id,
   name = excluded.name,
   channel = excluded.channel,
   tier = excluded.tier,

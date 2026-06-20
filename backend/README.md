@@ -25,6 +25,7 @@ The backend defaults to `http://localhost:3001`.
 - `GET /api` returns the API status and endpoint list
 - `GET /api/health` returns `{ "status": "ok" }`
 - `GET /api/db-status` returns database configuration/connection status
+- `GET /api/dashboard` returns the nested app data used by the role-based frontend
 - `GET /api/mock-data` returns all current mock-backed data collections
 - `GET /api/roles`
 - `GET /api/brands`
@@ -39,6 +40,7 @@ The backend defaults to `http://localhost:3001`.
 - `GET /api/brief-versions`
 - `GET /api/draft-statuses`
 - `GET /api/current-staff`
+- `PATCH /api/influencers/:id` updates influencer status/content fields when `DATABASE_URL` is configured
 
 ## Environment
 
@@ -54,5 +56,7 @@ After deployment, test:
 
 ```bash
 curl https://your-domain.vercel.app/api/health
+curl https://your-domain.vercel.app/api/db-status
+curl https://your-domain.vercel.app/api/dashboard
 curl https://your-domain.vercel.app/api/brands
 ```
