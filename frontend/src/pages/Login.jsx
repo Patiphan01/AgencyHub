@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
-import { roles } from '../mock/agencyData'
+import { getRoles } from '../services/apiClient'
+
+const fallbackRoles = ['Brand', 'Owner', 'Staff']
 
 const roleLabels = {
   Brand: 'แบรนด์',
@@ -11,8 +13,24 @@ const roleLabels = {
 
 function Login() {
   const [selectedRole, setSelectedRole] = useState('Owner')
+  const [roles, setRoles] = useState(fallbackRoles)
   const navigate = useNavigate()
   const { language, t, toggleLanguage } = useLanguage()
+
+  useEffect(() => {
+    let cancelled = false
+
+    getRoles()
+      .then((data) => {
+        const values = data.map((role) => (typeof role === 'string' ? role : role.name)).filter(Boolean)
+        if (!cancelled && values.length) setRoles(values)
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function handleLogin(event) {
     event.preventDefault()

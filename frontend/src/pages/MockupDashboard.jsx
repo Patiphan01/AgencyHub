@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getDashboardData, updateInfluencer } from '../services/apiClient'
 
 const TIERS = ['Nano', 'Micro', 'Mid', 'Macro', 'Mega']
 const TIER_COLOR = {
@@ -143,6 +144,12 @@ const DB = {
   seniors: [{ id: 's1', name: 'พี่ตั้ม', role: 'Senior Manager' }, { id: 's2', name: 'พี่นก', role: 'Senior Coordinator' }],
 }
 
+const DashboardDataContext = createContext(DB)
+
+function useDashboardData() {
+  return useContext(DashboardDataContext)
+}
+
 function totalTier(campaign, key) {
   return TIERS.reduce((sum, tier) => sum + campaign.tierStats[tier][key], 0)
 }
@@ -259,13 +266,47 @@ function getInitialRole() {
 
 function MockupDashboard() {
   const navigate = useNavigate()
+  const [dashboardData, setDashboardData] = useState(DB)
+  const [loadingData, setLoadingData] = useState(true)
+  const [dataError, setDataError] = useState('')
   const [state, setState] = useState(() => {
     const role = getInitialRole()
     return { role, view: 'dashboard', brandId: null, campaignId: null, tab: role === 'owner' ? 'review' : 'source' }
   })
   const [selectedCandidateIds, setSelectedCandidateIds] = useState(() => new Set())
   const [modal, setModal] = useState(null)
-  const allCampaigns = useMemo(() => DB.brands.flatMap((brand) => brand.campaigns.map((campaign) => ({ ...campaign, brandName: brand.name, brandId: brand.id }))), [])
+  const allCampaigns = useMemo(
+    () => dashboardData.brands.flatMap((brand) => brand.campaigns.map((campaign) => ({ ...campaign, brandName: brand.name, brandId: brand.id }))),
+    [dashboardData],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    getDashboardData()
+      .then((data) => {
+        if (!cancelled && data?.brands?.length) {
+          setDashboardData(data)
+          setDataError('')
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) setDataError(error.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingData(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function refreshDashboardData() {
+    return getDashboardData().then((data) => {
+      if (data?.brands?.length) setDashboardData(data)
+    })
+  }
 
   function go(next) {
     setState((current) => ({ ...current, ...next }))
@@ -278,7 +319,7 @@ function MockupDashboard() {
   }
 
   function getBrand(id) {
-    return DB.brands.find((brand) => brand.id === id)
+    return dashboardData.brands.find((brand) => brand.id === id)
   }
 
   function getCampaign(brandId, campaignId) {
@@ -288,8 +329,9 @@ function MockupDashboard() {
   const crumbs = getCrumbs(state)
 
   return (
-    <div className="agency-mockup">
-      <div className="mockup-app">
+    <DashboardDataContext.Provider value={dashboardData}>
+      <div className="agency-mockup">
+        <div className="mockup-app">
         <div className="mockup-topbar">
           <div className="logo">
             <div className="logo-mark">A</div>
@@ -314,26 +356,30 @@ function MockupDashboard() {
           ))}
         </div>
 
+        {loadingData ? <div className="note-banner">กำลังโหลดข้อมูลจาก Backend API...</div> : null}
+        {dataError ? <div className="note-banner">ใช้ข้อมูลสำรองในหน้า เพราะเรียก API ไม่สำเร็จ: {dataError}</div> : null}
+
         <main>
           {state.role === 'brand' && (state.view === 'dashboard'
             ? <BrandDashboard go={go} />
-            : <BrandCampaign campaign={getCampaign(DB.brands[0].id, state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} />)}
+            : <BrandCampaign campaign={getCampaign(dashboardData.brands[0].id, state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} refreshDashboardData={refreshDashboardData} />)}
 
           {state.role === 'owner' && (state.view === 'dashboard'
             ? <OwnerDashboard allCampaigns={allCampaigns} go={go} openModal={setModal} />
             : state.view === 'brand'
               ? <OwnerBrand brand={getBrand(state.brandId)} go={go} />
-              : <OwnerCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} openModal={setModal} />)}
+              : <OwnerCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} openModal={setModal} refreshDashboardData={refreshDashboardData} />)}
 
           {state.role === 'staff' && (state.view === 'dashboard'
             ? <StaffDashboard allCampaigns={allCampaigns} go={go} />
             : state.view === 'brand'
               ? <StaffBrand brand={getBrand(state.brandId)} go={go} />
-              : <StaffCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} />)}
+              : <StaffCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} refreshDashboardData={refreshDashboardData} />)}
         </main>
         {modal ? <MockupModal type={modal} onClose={() => setModal(null)} /> : null}
       </div>
     </div>
+    </DashboardDataContext.Provider>
   )
 
   function getCrumbs(current) {
@@ -343,7 +389,7 @@ function MockupDashboard() {
       list.push({ label: getBrand(current.brandId).name, action: () => go({ view: 'brand', campaignId: null }) })
     }
     if (current.campaignId) {
-      const brandId = current.brandId || DB.brands[0].id
+      const brandId = current.brandId || dashboardData.brands[0].id
       list.push({ label: getCampaign(brandId, current.campaignId).name })
     }
     return list
@@ -351,7 +397,8 @@ function MockupDashboard() {
 }
 
 function BrandDashboard({ go }) {
-  const brand = DB.brands[0]
+  const db = useDashboardData()
+  const brand = db.brands[0]
   const allTarget = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
   const allSelected = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
   const allPosted = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'posted'), 0)
@@ -388,7 +435,7 @@ function BrandDashboard({ go }) {
   )
 }
 
-function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds, state, go }) {
+function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds, state, go, refreshDashboardData }) {
   return (
     <>
       <h1 className="page-title">{campaign.name}</h1>
@@ -398,13 +445,13 @@ function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds
       </p>
       <Tabs tabs={[['select', 'คัดเลือกอินฟลูเอนเซอร์'], ['progress', 'ความคืบหน้าการลงคลิป']]} active={state.tab} onChange={(tab) => go({ tab })} />
       {state.tab === 'select'
-        ? <BrandSelectTab campaign={campaign} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} />
+        ? <BrandSelectTab campaign={campaign} refreshDashboardData={refreshDashboardData} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} />
         : <BrandProgressTab campaign={campaign} />}
     </>
   )
 }
 
-function BrandSelectTab({ campaign, selectedCandidateIds, setSelectedCandidateIds }) {
+function BrandSelectTab({ campaign, refreshDashboardData, selectedCandidateIds, setSelectedCandidateIds }) {
   const selected = totalTier(campaign, 'brandSelected')
   const submitted = totalTier(campaign, 'sourced')
   const candidates = campaign.influencers.filter((item) => item.status === 'owner_approved' || item.status === 'brand_selected')
@@ -420,6 +467,26 @@ function BrandSelectTab({ campaign, selectedCandidateIds, setSelectedCandidateId
     })
   }
 
+  async function confirmSelectedCandidates() {
+    const ids = candidates
+      .filter((item) => selectedCandidateIds.has(item.id) && item.status !== 'brand_selected')
+      .map((item) => item.id)
+
+    if (!ids.length) {
+      alert('ยังไม่มีรายชื่อใหม่ที่เลือกเพิ่ม')
+      return
+    }
+
+    try {
+      await Promise.all(ids.map((id) => updateInfluencer(id, { status: 'brand_selected' })))
+      setSelectedCandidateIds(new Set())
+      await refreshDashboardData()
+      alert('บันทึกผลการคัดเลือกลง Database แล้ว')
+    } catch (error) {
+      alert(`ยังบันทึกไม่ได้: ${error.message}`)
+    }
+  }
+
   return (
     <>
       <div className="note-banner">โควต้าที่คุณสามารถเลือกได้สูงสุด <b>{campaign.brandQuota} คน</b> (กำหนดโดยทีม) — ตอนนี้เลือกแล้ว <b>{checkedCount}</b> คน เหลือเลือกได้อีก <b>{remaining}</b> คน</div>
@@ -433,7 +500,7 @@ function BrandSelectTab({ campaign, selectedCandidateIds, setSelectedCandidateId
       <div className="card">
         <div className="flex-between table-heading">
           <div className="section-title no-margin">รายชื่อรอการคัดเลือก <span className="hint">ติ๊กเพื่อเลือก / ยกเลิกการเลือก</span></div>
-          <button className="btn primary" onClick={() => alert('ส่งผลการคัดเลือกกลับให้หัวหน้าแล้ว')} type="button">ยืนยันรายชื่อที่เลือก</button>
+          <button className="btn primary" onClick={confirmSelectedCandidates} type="button">ยืนยันรายชื่อที่เลือก</button>
         </div>
         <div className="table-wrap">
           <table>
@@ -466,6 +533,7 @@ function BrandProgressTab({ campaign }) {
 }
 
 function OwnerDashboard({ allCampaigns, go, openModal }) {
+  const db = useDashboardData()
   const sumTarget = allCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
   const sumConfirmed = allCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
   const pendingReview = allCampaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved').length, 0)
@@ -480,7 +548,7 @@ function OwnerDashboard({ allCampaigns, go, openModal }) {
         <button className="btn primary" onClick={() => openModal('brand')} type="button">+ เพิ่มแบรนด์ใหม่</button>
       </div>
       <div className="grid cols-4 block-gap owner-stats">
-        <Stat label="แบรนด์ที่ดูแล" value={DB.brands.length} />
+        <Stat label="แบรนด์ที่ดูแล" value={db.brands.length} />
         <Stat label="แคมเปญทั้งหมด" value={allCampaigns.length} />
         <Stat label="อินฟลูยืนยันแล้ว / เป้า" value={sumConfirmed} sub={`/ ${sumTarget}`} />
         <Stat label="รอหัวหน้าตรวจ" value={pendingReview} tone="warning" />
@@ -488,7 +556,7 @@ function OwnerDashboard({ allCampaigns, go, openModal }) {
       <SeniorReviewerPanel openModal={openModal} />
       <div className="section-title">รายชื่อแบรนด์</div>
       <div className="grid cols-2">
-        {DB.brands.map((brand) => {
+        {db.brands.map((brand) => {
           const target = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
           const selected = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
           const pending = brand.campaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved').length, 0)
@@ -510,6 +578,7 @@ function OwnerDashboard({ allCampaigns, go, openModal }) {
 }
 
 function SeniorReviewerPanel({ openModal }) {
+  const db = useDashboardData()
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
@@ -517,7 +586,7 @@ function SeniorReviewerPanel({ openModal }) {
         <button className="btn secondary sm" onClick={() => openModal('senior')} type="button">จัดการสิทธิ์</button>
       </div>
       <div className="senior-list">
-        {DB.seniors.map((senior) => (
+        {db.seniors.map((senior) => (
           <div className="senior-card" key={senior.id}>
             <div className="senior-avatar">{senior.name.slice(-1)}</div>
             <div>
@@ -564,22 +633,42 @@ function OwnerBrand({ brand, go }) {
   )
 }
 
-function OwnerCampaign({ brand, campaign, state, go, openModal }) {
+function OwnerCampaign({ brand, campaign, state, go, openModal, refreshDashboardData }) {
   return (
     <>
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">{brand.name} · {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}</p>
       <Tabs tabs={[['review', 'ตรวจรายชื่อจากทีม'], ['setup', 'บรีฟ & เป้าหมาย'], ['prod', 'ภาพรวมการผลิตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
-      {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} openModal={openModal} /> : <OwnerProductionTab campaign={campaign} />}
+      {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} refreshDashboardData={refreshDashboardData} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} openModal={openModal} /> : <OwnerProductionTab campaign={campaign} />}
     </>
   )
 }
 
-function OwnerReviewTab({ campaign }) {
+function OwnerReviewTab({ campaign, refreshDashboardData }) {
   const pending = campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved')
   const approvedWaitingBrand = campaign.influencers.filter((item) => item.status === 'owner_approved')
   const selectedByBrand = campaign.influencers.filter((item) => item.status === 'brand_selected')
   const seniorApprovedCount = pending.filter((item) => item.status === 'senior_approved').length
+
+  async function patchInfluencer(id, values, successMessage) {
+    try {
+      await updateInfluencer(id, values)
+      await refreshDashboardData()
+      alert(successMessage)
+    } catch (error) {
+      alert(`ยังบันทึกไม่ได้: ${error.message}`)
+    }
+  }
+
+  async function confirmSelectedByBrand() {
+    try {
+      await Promise.all(selectedByBrand.map((item) => updateInfluencer(item.id, { status: 'confirmed' })))
+      await refreshDashboardData()
+      alert('ยืนยันรายชื่อสุดท้ายลง Database แล้ว')
+    } catch (error) {
+      alert(`ยังบันทึกไม่ได้: ${error.message}`)
+    }
+  }
 
   return (
     <>
@@ -590,14 +679,22 @@ function OwnerReviewTab({ campaign }) {
         <Stat label="แบรนด์ยืนยันแล้ว" value={totalTier(campaign, 'brandSelected')} sub={`/ ${campaign.brandQuota}`} />
       </div>
       <OwnerAddInfluencerForm />
-      <ReviewCard rows={pending} title={<>รายชื่อรอตรวจ ({pending.length}) {seniorApprovedCount ? <span className="senior-chip title-chip">✓ Senior อนุมัติแล้ว {seniorApprovedCount} คน</span> : null}</>} actionLabel={pending.length ? 'ส่งที่อนุมัติให้แบรนด์' : ''} showSenior />
+      <ReviewCard
+        onApprove={(id) => patchInfluencer(id, { status: 'owner_approved' }, 'คัดผ่านและบันทึกลง Database แล้ว')}
+        onReject={(id) => patchInfluencer(id, { status: 'owner_rejected' }, 'คัดออกและบันทึกลง Database แล้ว')}
+        rows={pending}
+        title={<>รายชื่อรอตรวจ ({pending.length}) {seniorApprovedCount ? <span className="senior-chip title-chip">✓ Senior อนุมัติแล้ว {seniorApprovedCount} คน</span> : null}</>}
+        actionLabel={pending.length ? 'ส่งที่อนุมัติให้แบรนด์' : ''}
+        showSenior
+      />
       <SimpleInfluencerCard rows={approvedWaitingBrand} title={`ส่งให้แบรนด์แล้ว — รอแบรนด์เลือก (${approvedWaitingBrand.length})`} />
-      <SimpleInfluencerCard rows={selectedByBrand} title={`แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})`} actionLabel={selectedByBrand.length ? 'ยืนยัน & แจ้งทีม' : ''} showBank />
+      <SimpleInfluencerCard rows={selectedByBrand} title={`แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})`} actionLabel={selectedByBrand.length ? 'ยืนยัน & แจ้งทีม' : ''} onAction={confirmSelectedByBrand} showBank />
     </>
   )
 }
 
 function OwnerSetupTab({ campaign, openModal }) {
+  const db = useDashboardData()
   return (
     <>
       <div className="grid cols-2">
@@ -631,7 +728,7 @@ function OwnerSetupTab({ campaign, openModal }) {
       </div>
       <div className="card target-card">
         <div className="section-title">Senior Reviewer <span className="hint">ให้สิทธิ์ช่วยคัดรายชื่อก่อนถึงหัวหน้า</span></div>
-        {DB.seniors.map((senior) => (
+        {db.seniors.map((senior) => (
           <div className="senior-permission-row" key={senior.id}>
             <div className="senior-person">
               <div className="senior-avatar small">{senior.name.slice(-1)}</div>
@@ -667,6 +764,7 @@ function OwnerProductionTab({ campaign }) {
 }
 
 function StaffDashboard({ allCampaigns, go }) {
+  const db = useDashboardData()
   const sumFound = allCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'sourced'), 0)
   const sumTarget = allCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
   return (
@@ -674,12 +772,12 @@ function StaffDashboard({ allCampaigns, go }) {
       <h1 className="page-title">งานของฉัน</h1>
       <p className="page-sub">เลือกแบรนด์เพื่อดูแคมเปญและบรีฟที่ต้องหาอินฟลู</p>
       <div className="grid cols-3 block-gap">
-        <Stat label="แบรนด์ที่ดูแล" value={DB.brands.length} />
+        <Stat label="แบรนด์ที่ดูแล" value={db.brands.length} />
         <Stat label="แคมเปญทั้งหมด" value={allCampaigns.length} />
         <Stat label="หาได้แล้ว / เป้ารวม" value={sumFound} sub={`/ ${sumTarget}`} />
       </div>
       <div className="grid cols-2">
-        {DB.brands.map((brand) => {
+        {db.brands.map((brand) => {
           const found = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'sourced'), 0)
           const target = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
           return (
@@ -714,13 +812,13 @@ function StaffBrand({ brand, go }) {
   )
 }
 
-function StaffCampaign({ brand, campaign, state, go }) {
+function StaffCampaign({ brand, campaign, state, go, refreshDashboardData }) {
   return (
     <>
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">{brand.name} · {campaign.status} {campaign.briefFile ? <>· <a className="link" href="#">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : '· ยังไม่มีไฟล์บรีฟ'}</p>
       <Tabs tabs={[['source', 'หาอินฟลูเอนเซอร์'], ['track', 'ติดตามงาน / อัปเดตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
-      {state.tab === 'source' ? <StaffSourceTab campaign={campaign} /> : <StaffTrackTab campaign={campaign} />}
+      {state.tab === 'source' ? <StaffSourceTab campaign={campaign} /> : <StaffTrackTab campaign={campaign} refreshDashboardData={refreshDashboardData} />}
     </>
   )
 }
@@ -766,15 +864,15 @@ function StaffSourceTab({ campaign }) {
   )
 }
 
-function StaffTrackTab({ campaign }) {
+function StaffTrackTab({ campaign, refreshDashboardData }) {
   const rows = campaign.influencers.filter((item) => item.status === 'confirmed')
   if (!rows.length) return <EmptyState icon="งาน" title="ยังไม่มีรายชื่อที่ถูกยืนยัน" desc="เมื่อหัวหน้ายืนยันรายชื่อสุดท้ายจากแบรนด์ รายชื่อจะมาแสดงที่นี่เพื่อให้อัปเดตงานได้" />
   return (
     <>
       <div className="note-banner">อัปเดตสถานะของแต่ละคนทุกวันจนกว่าจะลงคลิปครบ — หัวหน้าจะเห็นการอัปเดตนี้แบบเรียลไทม์</div>
       <div className="card">
-        <EditableTrackTable rows={rows} />
-        <button className="btn primary form-action" onClick={() => alert('บันทึกการอัปเดตแล้ว')} type="button">บันทึกการอัปเดต</button>
+        <EditableTrackTable refreshDashboardData={refreshDashboardData} rows={rows} />
+        <button className="btn primary form-action" onClick={() => alert('แก้ไขข้อมูลในตารางจะบันทึกลง Database ทันทีเมื่อเปลี่ยนค่า')} type="button">บันทึกการอัปเดต</button>
       </div>
     </>
   )
@@ -866,7 +964,7 @@ function TierSummaryTable({ campaign }) {
   )
 }
 
-function ReviewCard({ rows, title, actionLabel, showSenior = false }) {
+function ReviewCard({ rows, title, actionLabel, showSenior = false, onApprove, onReject }) {
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
@@ -886,8 +984,8 @@ function ReviewCard({ rows, title, actionLabel, showSenior = false }) {
                   <td>{item.addedBy}</td>
                   {showSenior ? <td><SeniorChip approval={item.seniorApproval} /></td> : null}
                   <td className="button-cell">
-                    <button className="btn sm primary" onClick={() => alert('คัดผ่าน → ส่งให้แบรนด์')} type="button">คัดผ่าน</button>
-                    <button className="btn sm secondary" onClick={() => alert('คัดออก')} type="button">คัดออก</button>
+                    <button className="btn sm primary" onClick={() => onApprove?.(item.id)} type="button">คัดผ่าน</button>
+                    <button className="btn sm secondary" onClick={() => onReject?.(item.id)} type="button">คัดออก</button>
                   </td>
                 </tr>
               ))}
@@ -899,12 +997,12 @@ function ReviewCard({ rows, title, actionLabel, showSenior = false }) {
   )
 }
 
-function SimpleInfluencerCard({ rows, title, actionLabel, showBank = false }) {
+function SimpleInfluencerCard({ rows, title, actionLabel, showBank = false, onAction }) {
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
         <div className="section-title no-margin">{title}</div>
-        {actionLabel ? <button className="btn primary" onClick={() => alert('ยืนยันรายชื่อสุดท้าย และแจ้งทีมให้เริ่มงาน + ส่งสินค้า')} type="button">{actionLabel}</button> : null}
+        {actionLabel ? <button className="btn primary" onClick={onAction} type="button">{actionLabel}</button> : null}
       </div>
       <InfluencerListTable rows={rows} showBank={showBank} />
     </div>
@@ -980,7 +1078,16 @@ function InfluencerProgressTable({ rows, title = 'รายชื่อที่
   )
 }
 
-function EditableTrackTable({ rows }) {
+function EditableTrackTable({ rows, refreshDashboardData }) {
+  async function saveInfluencer(id, values) {
+    try {
+      await updateInfluencer(id, values)
+      await refreshDashboardData()
+    } catch (error) {
+      alert(`ยังบันทึกไม่ได้: ${error.message}`)
+    }
+  }
+
   return (
     <div className="table-wrap">
       <table>
@@ -993,13 +1100,13 @@ function EditableTrackTable({ rows }) {
               <td>{item.dealDate}</td>
               <td><input defaultChecked={item.draft !== 'waiting'} type="checkbox" /></td>
               <td>
-                <select className="draft-select" defaultValue={item.draft}>
+                <select className="draft-select" defaultValue={item.draft} onChange={(event) => saveInfluencer(item.id, { draft: event.target.value })}>
                   {Object.entries(DRAFT_MAP).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
                 </select>
               </td>
-              <td><input className="compact-input" defaultValue={item.draft === 'posted' ? '2026-07-05' : ''} type="date" /></td>
-              <td><input className="link-input small" defaultValue={item.postLink} placeholder="ลิงก์คลิป" type="text" /></td>
-              <td><input className="link-input" defaultValue={item.assetLink} placeholder="ลิงก์ Asset (Drive/Dropbox)" type="text" /></td>
+              <td><input className="compact-input" defaultValue={item.draft === 'posted' ? '2026-07-05' : ''} onBlur={(event) => saveInfluencer(item.id, { postDate: event.target.value })} type="date" /></td>
+              <td><input className="link-input small" defaultValue={item.postLink} onBlur={(event) => saveInfluencer(item.id, { postLink: event.target.value })} placeholder="ลิงก์คลิป" type="text" /></td>
+              <td><input className="link-input" defaultValue={item.assetLink} onBlur={(event) => saveInfluencer(item.id, { assetLink: event.target.value })} placeholder="ลิงก์ Asset (Drive/Dropbox)" type="text" /></td>
               <td>{item.bank ? <BankChip bank={item.bank} /> : <button className="btn xs secondary" onClick={() => alert('เปิดฟอร์มใส่ข้อมูลธนาคาร')} type="button">+ ใส่ธนาคาร</button>}</td>
             </tr>
           ))}

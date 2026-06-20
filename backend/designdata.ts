@@ -247,6 +247,12 @@ export const backendApiReference = [
   },
   {
     method: 'GET',
+    path: '/api/db-status',
+    purpose: 'Returns whether DATABASE_URL is configured and whether Postgres can be reached.',
+    response: { configured: false, connected: false, provider: 'postgres' },
+  },
+  {
+    method: 'GET',
     path: '/api/mock-data',
     purpose: 'Returns all current mock-backed data collections for migration/testing.',
     response: 'roles, brands, campaigns, influencers, tasks, notifications, activities, tierTargets, briefVersions, draftStatuses, currentStaffName',
