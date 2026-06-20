@@ -5,7 +5,9 @@
   "scripts": {
     "backend:dev": "node backend/server.js",
     "frontend:dev": "cd frontend && npm run dev",
-    "build": "cd frontend && npm install && npm run build"
+    "build": "cd frontend && npm install && npm run build",
+    "db:migrate": "node backend/db/run-sql-file.js backend/db/migrations/001_initial_schema.sql",
+    "db:seed": "node backend/db/run-sql-file.js backend/db/seeds/001_seed_from_current_mock.sql"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

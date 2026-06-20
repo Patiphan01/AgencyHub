@@ -16,10 +16,18 @@ Vercel's current Postgres docs state that Vercel Postgres is no longer available
 3. Add a Postgres provider, recommended: Neon.
 4. Connect it to this project.
 5. Make sure Vercel creates/injects `DATABASE_URL`.
-6. Open the Neon SQL Editor.
-7. Run `migrations/001_initial_schema.sql`.
-8. Run `seeds/001_seed_from_current_mock.sql`.
-9. Redeploy Vercel.
+6. Pull env vars locally or copy the database URL into `.env.local`.
+7. Run the migration and seed scripts.
+8. Redeploy Vercel.
+
+```bash
+vercel env pull .env.local
+npm run db:migrate
+npm run db:seed
+vercel --prod
+```
+
+If you use an online SQL runner that says `cannot insert multiple commands into a prepared statement`, do not paste the whole SQL file into one prepared query. Use the scripts above; they split the file and run each SQL statement one at a time.
 
 ## Test
 

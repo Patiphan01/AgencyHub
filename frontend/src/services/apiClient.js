@@ -2,9 +2,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 async function getJson(path) {
   const response = await fetch(`${API_BASE_URL}${path}`)
+  const contentType = response.headers.get('content-type') || ''
 
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`)
+  }
+
+  if (!contentType.includes('application/json')) {
+    throw new Error(`API did not return JSON for ${path}. Check Vercel API routing.`)
   }
 
   return response.json()
@@ -18,9 +23,14 @@ async function sendJson(path, options) {
       ...(options?.headers || {}),
     },
   })
+  const contentType = response.headers.get('content-type') || ''
 
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`)
+  }
+
+  if (!contentType.includes('application/json')) {
+    throw new Error(`API did not return JSON for ${path}. Check Vercel API routing.`)
   }
 
   return response.json()

@@ -1,15 +1,20 @@
 let sqlClient
 
+function getDatabaseUrl() {
+  return process.env.DATABASE_URL || process.env.POSTGRES_URL
+}
+
 export function hasDatabaseUrl() {
-  return Boolean(process.env.DATABASE_URL)
+  return Boolean(getDatabaseUrl())
 }
 
 export async function getSql() {
-  if (!process.env.DATABASE_URL) return null
+  const databaseUrl = getDatabaseUrl()
+  if (!databaseUrl) return null
 
   if (!sqlClient) {
     const postgres = (await import('postgres')).default
-    sqlClient = postgres(process.env.DATABASE_URL, {
+    sqlClient = postgres(databaseUrl, {
       max: 1,
       idle_timeout: 20,
       connect_timeout: 10,
