@@ -897,9 +897,13 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
 
   async function handleAddInfluencer(event) {
     event.preventDefault()
-    const source = event.currentTarget.tagName === 'FORM' ? event.currentTarget : event.currentTarget.closest('.card')
-    const formData = new FormData(source)
-    const controls = Array.from(source.querySelectorAll('input, select'))
+    const formElement = event.currentTarget.tagName === 'FORM' ? event.currentTarget : event.currentTarget.closest('form')
+    if (!formElement) {
+      alert('ไม่พบฟอร์มสำหรับเพิ่มรายชื่อ')
+      return
+    }
+    const formData = new FormData(formElement)
+    const controls = Array.from(formElement.querySelectorAll('input, select'))
     const getValue = (name, index) => formData.get(name) || controls[index]?.value || ''
 
     try {
