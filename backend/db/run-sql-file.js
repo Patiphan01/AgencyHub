@@ -1,9 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import postgres from 'postgres'
 
-const projectRoot = path.resolve(new URL('../../..', import.meta.url).pathname)
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const projectRoot = path.resolve(__dirname, '../..')
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return
@@ -62,7 +65,14 @@ async function main() {
   loadEnvFile(path.join(projectRoot, '.env.local'))
   loadEnvFile(path.join(projectRoot, '.env.development.local'))
 
-  const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+  const databaseUrl = (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.Agency_hub_DATABASE_URL ||
+    process.env.Agency_hub_POSTGRES_URL ||
+    process.env.Agency_hub_DATABASE_URL_UNPOOLED ||
+    process.env.Agency_hub_POSTGRES_URL_NON_POOLING
+  )
   const inputPath = process.argv[2]
 
   if (!inputPath) {

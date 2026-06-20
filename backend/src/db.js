@@ -1,7 +1,47 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 let sqlClient
 
+function loadLocalEnv() {
+  const __filename = fileURLToPath(import.meta.url)
+  const __dirname = path.dirname(__filename)
+  const projectRoot = path.resolve(__dirname, '../..')
+  const envFiles = ['.env', '.env.local', '.env.development.local']
+
+  envFiles.forEach((fileName) => {
+    const filePath = path.join(projectRoot, fileName)
+    if (!fs.existsSync(filePath)) return
+
+    const content = fs.readFileSync(filePath, 'utf8')
+    content.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) return
+
+      const equalsIndex = trimmed.indexOf('=')
+      if (equalsIndex === -1) return
+
+      const key = trimmed.slice(0, equalsIndex).trim()
+      const rawValue = trimmed.slice(equalsIndex + 1).trim()
+      const value = rawValue.replace(/^["']|["']$/g, '')
+
+      if (!process.env[key]) process.env[key] = value
+    })
+  })
+}
+
+loadLocalEnv()
+
 function getDatabaseUrl() {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.Agency_hub_DATABASE_URL ||
+    process.env.Agency_hub_POSTGRES_URL ||
+    process.env.Agency_hub_DATABASE_URL_UNPOOLED ||
+    process.env.Agency_hub_POSTGRES_URL_NON_POOLING
+  )
 }
 
 export function hasDatabaseUrl() {
