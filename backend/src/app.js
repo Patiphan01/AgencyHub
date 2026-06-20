@@ -11,7 +11,7 @@ import {
   tasks,
   tierTargets,
 } from '../../frontend/src/mock/agencyData.js'
-import { getDashboardRows, getDatabaseStatus, getRowById, hasDatabaseUrl, listRows, updateInfluencer } from './db.js'
+import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardRows, getDatabaseStatus, getRowById, hasDatabaseUrl, listRows, updateInfluencer } from './db.js'
 
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -20,7 +20,7 @@ const jsonHeaders = {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type,Authorization',
 }
 
@@ -53,6 +53,10 @@ const apiEndpoints = [
   'GET /api/brief-versions',
   'GET /api/draft-statuses',
   'GET /api/current-staff',
+  'POST /api/brands',
+  'DELETE /api/brands/:id',
+  'POST /api/campaigns',
+  'POST /api/influencers',
   'PATCH /api/influencers/:id',
 ]
 
@@ -228,7 +232,7 @@ function buildDashboardData(rows) {
   })
 
   return {
-    brands: [...brandMap.values()].filter((brand) => brand.campaigns.length > 0),
+    brands: [...brandMap.values()],
     seniors,
   }
 }
@@ -246,6 +250,65 @@ export async function handleApiRequest(req, res) {
     const pathParts = url.pathname.split('/').filter(Boolean)
     const resource = pathParts[1]
     const id = pathParts[2]
+
+    if (req.method === 'POST' && resource === 'brands') {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to persist brands.',
+        })
+      }
+
+      const body = await readJsonBody(req)
+      const created = await createBrand(body)
+      return sendJson(res, 201, camelizeRow(created))
+    }
+
+    if (req.method === 'DELETE' && resource === 'brands' && id) {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to delete brands.',
+        })
+      }
+
+      const deleted = await deleteBrand(id)
+
+      if (!deleted) {
+        return sendJson(res, 404, {
+          error: 'not_found',
+          message: `No brands item found for id "${id}".`,
+        })
+      }
+
+      return sendJson(res, 200, camelizeRow(deleted))
+    }
+
+    if (req.method === 'POST' && resource === 'campaigns') {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to persist campaigns.',
+        })
+      }
+
+      const body = await readJsonBody(req)
+      const created = await createCampaign(body)
+      return sendJson(res, 201, camelizeRow(created))
+    }
+
+    if (req.method === 'POST' && resource === 'influencers') {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to persist influencers.',
+        })
+      }
+
+      const body = await readJsonBody(req)
+      const created = await createInfluencer(body)
+      return sendJson(res, 201, camelizeRow(created))
+    }
 
     if (req.method === 'PATCH' && resource === 'influencers' && id) {
       if (!hasDatabaseUrl()) {

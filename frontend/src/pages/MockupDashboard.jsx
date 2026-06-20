@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getDashboardData, updateInfluencer } from '../services/apiClient'
+import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardData, updateInfluencer } from '../services/apiClient'
 
 const TIERS = ['Nano', 'Micro', 'Mid', 'Macro', 'Mega']
 const TIER_COLOR = {
@@ -145,6 +145,7 @@ const DB = {
 }
 
 const DashboardDataContext = createContext(DB)
+const EMPTY_DASHBOARD_DATA = { brands: [], seniors: DB.seniors }
 
 function useDashboardData() {
   return useContext(DashboardDataContext)
@@ -266,7 +267,7 @@ function getInitialRole() {
 
 function MockupDashboard() {
   const navigate = useNavigate()
-  const [dashboardData, setDashboardData] = useState(DB)
+  const [dashboardData, setDashboardData] = useState(EMPTY_DASHBOARD_DATA)
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
   const [state, setState] = useState(() => {
@@ -285,8 +286,8 @@ function MockupDashboard() {
 
     getDashboardData()
       .then((data) => {
-        if (!cancelled && data?.brands?.length) {
-          setDashboardData(data)
+        if (!cancelled && data?.brands) {
+          setDashboardData({ brands: data.brands || [], seniors: data.seniors || DB.seniors })
           setDataError('')
         }
       })
@@ -304,7 +305,7 @@ function MockupDashboard() {
 
   function refreshDashboardData() {
     return getDashboardData().then((data) => {
-      if (data?.brands?.length) setDashboardData(data)
+      if (data?.brands) setDashboardData({ brands: data.brands || [], seniors: data.seniors || DB.seniors })
     })
   }
 
@@ -360,23 +361,27 @@ function MockupDashboard() {
         {dataError ? <div className="note-banner">ใช้ข้อมูลสำรองในหน้า เพราะเรียก API ไม่สำเร็จ: {dataError}</div> : null}
 
         <main>
-          {state.role === 'brand' && (state.view === 'dashboard'
+          {!loadingData && !dashboardData.brands.length ? (
+            <EmptyState icon="ข้อมูล" title="ยังไม่มีข้อมูลในระบบ" desc="ฐานข้อมูลเชื่อมต่อแล้ว แต่ยังไม่มีแบรนด์หรือแคมเปญ กรุณาเพิ่มข้อมูลจริงก่อนเริ่มใช้งาน" />
+          ) : null}
+
+          {dashboardData.brands.length > 0 && state.role === 'brand' && (state.view === 'dashboard'
             ? <BrandDashboard go={go} />
             : <BrandCampaign campaign={getCampaign(dashboardData.brands[0].id, state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} refreshDashboardData={refreshDashboardData} />)}
 
           {state.role === 'owner' && (state.view === 'dashboard'
             ? <OwnerDashboard allCampaigns={allCampaigns} go={go} openModal={setModal} />
-            : state.view === 'brand'
-              ? <OwnerBrand brand={getBrand(state.brandId)} go={go} />
+            : dashboardData.brands.length > 0 && state.view === 'brand'
+              ? <OwnerBrand brand={getBrand(state.brandId)} go={go} openModal={setModal} refreshDashboardData={refreshDashboardData} />
               : <OwnerCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} openModal={setModal} refreshDashboardData={refreshDashboardData} />)}
 
-          {state.role === 'staff' && (state.view === 'dashboard'
+          {dashboardData.brands.length > 0 && state.role === 'staff' && (state.view === 'dashboard'
             ? <StaffDashboard allCampaigns={allCampaigns} go={go} />
             : state.view === 'brand'
               ? <StaffBrand brand={getBrand(state.brandId)} go={go} />
               : <StaffCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} refreshDashboardData={refreshDashboardData} />)}
         </main>
-        {modal ? <MockupModal type={modal} onClose={() => setModal(null)} /> : null}
+        {modal ? <MockupModal context={modal} onSaved={refreshDashboardData} type={typeof modal === 'string' ? modal : modal.type} onClose={() => setModal(null)} /> : null}
       </div>
     </div>
     </DashboardDataContext.Provider>
@@ -389,6 +394,7 @@ function MockupDashboard() {
       list.push({ label: getBrand(current.brandId).name, action: () => go({ view: 'brand', campaignId: null }) })
     }
     if (current.campaignId) {
+      if (!dashboardData.brands.length) return list
       const brandId = current.brandId || dashboardData.brands[0].id
       list.push({ label: getCampaign(brandId, current.campaignId).name })
     }
@@ -601,7 +607,20 @@ function SeniorReviewerPanel({ openModal }) {
   )
 }
 
-function OwnerBrand({ brand, go }) {
+function OwnerBrand({ brand, go, openModal, refreshDashboardData }) {
+  async function handleDeleteBrand() {
+    const confirmed = window.confirm(`ลบแบรนด์ "${brand.name}" และแคมเปญทั้งหมดของแบรนด์นี้หรือไม่?`)
+    if (!confirmed) return
+
+    try {
+      await deleteBrand(brand.id)
+      await refreshDashboardData()
+      go({ view: 'dashboard', brandId: null, campaignId: null })
+    } catch (error) {
+      alert(`ยังลบแบรนด์ไม่ได้: ${error.message}`)
+    }
+  }
+
   return (
     <>
       <div className="flex-between">
@@ -609,8 +628,14 @@ function OwnerBrand({ brand, go }) {
           <h1 className="page-title">{brand.name}</h1>
           <p className="page-sub">แคมเปญทั้งหมดของแบรนด์นี้</p>
         </div>
-        <button className="btn primary" onClick={() => alert('เปิดฟอร์มสร้างแคมเปญใหม่ + อัปโหลดบรีฟ')} type="button">+ สร้างแคมเปญใหม่</button>
       </div>
+      <div className="actions-inline block-gap">
+        <button className="btn danger-btn" onClick={handleDeleteBrand} type="button">ลบแบรนด์</button>
+        <button className="btn primary" onClick={() => openModal({ type: 'campaign', brand })} type="button">+ สร้างแคมเปญใหม่</button>
+      </div>
+      {!brand.campaigns.length ? (
+        <EmptyState icon="แคมเปญ" title="ยังไม่มีแคมเปญของแบรนด์นี้" desc="กดสร้างแคมเปญใหม่เพื่อเริ่มเพิ่มข้อมูลจริงลง Database" />
+      ) : null}
       <div className="grid cols-2">
         {brand.campaigns.map((campaign) => {
           const confirmed = totalTier(campaign, 'brandSelected')
@@ -678,7 +703,7 @@ function OwnerReviewTab({ campaign, refreshDashboardData }) {
         <Stat label="ส่งให้แบรนด์แล้ว" value={totalTier(campaign, 'ownerApproved')} />
         <Stat label="แบรนด์ยืนยันแล้ว" value={totalTier(campaign, 'brandSelected')} sub={`/ ${campaign.brandQuota}`} />
       </div>
-      <OwnerAddInfluencerForm />
+      <OwnerAddInfluencerForm campaign={campaign} refreshDashboardData={refreshDashboardData} />
       <ReviewCard
         onApprove={(id) => patchInfluencer(id, { status: 'owner_approved' }, 'คัดผ่านและบันทึกลง Database แล้ว')}
         onReject={(id) => patchInfluencer(id, { status: 'owner_rejected' }, 'คัดออกและบันทึกลง Database แล้ว')}
@@ -818,12 +843,56 @@ function StaffCampaign({ brand, campaign, state, go, refreshDashboardData }) {
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">{brand.name} · {campaign.status} {campaign.briefFile ? <>· <a className="link" href="#">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : '· ยังไม่มีไฟล์บรีฟ'}</p>
       <Tabs tabs={[['source', 'หาอินฟลูเอนเซอร์'], ['track', 'ติดตามงาน / อัปเดตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
-      {state.tab === 'source' ? <StaffSourceTab campaign={campaign} /> : <StaffTrackTab campaign={campaign} refreshDashboardData={refreshDashboardData} />}
+      {state.tab === 'source' ? <StaffSourceTab campaign={campaign} refreshDashboardData={refreshDashboardData} /> : <StaffTrackTab campaign={campaign} refreshDashboardData={refreshDashboardData} />}
     </>
   )
 }
 
-function StaffSourceTab({ campaign }) {
+function StaffSourceTab({ campaign, refreshDashboardData }) {
+  const [saving, setSaving] = useState(false)
+
+  async function handleAddInfluencer(event) {
+    event.preventDefault()
+    const source = event.currentTarget.tagName === 'FORM' ? event.currentTarget : event.currentTarget.closest('.card')
+    const formData = new FormData(source)
+    const controls = Array.from(source.querySelectorAll('input, select'))
+    const getValue = (name, index) => formData.get(name) || controls[index]?.value || ''
+
+    try {
+      setSaving(true)
+      await createInfluencer({
+        campaignId: campaign.id,
+        name: getValue('name', 0),
+        tier: getValue('tier', 1),
+        followers: getValue('followers', 2),
+        dealDate: getValue('dealDate', 3),
+        instagram: getValue('instagram', 4),
+        tiktok: getValue('tiktok', 5),
+        youtube: getValue('youtube', 6),
+        facebook: getValue('facebook', 7),
+        twitter: getValue('twitter', 8),
+        lemon8: getValue('lemon8', 9),
+        bankName: getValue('bankName', 10),
+        bankAccount: getValue('bankAccount', 11),
+        bankOwner: getValue('bankOwner', 12),
+        addedBy: 'Staff',
+        addedByRole: 'staff',
+        status: 'pending_owner',
+        draft: 'waiting',
+        draftStatus: 'Waiting draft',
+      })
+      controls.forEach((control) => {
+        if (control.tagName === 'SELECT') control.selectedIndex = 0
+        else control.value = ''
+      })
+      await refreshDashboardData()
+    } catch (error) {
+      alert(`ยังเพิ่มรายชื่อไม่ได้: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (campaign.influencers.length === 0 && !campaign.briefFile) {
     return <EmptyState icon="เอกสาร" title="ยังไม่มีบรีฟสำหรับแคมเปญนี้" desc="รอหัวหน้าอัปโหลดไฟล์บรีฟและตั้งเป้าหมายก่อนเริ่มหาอินฟลูเอนเซอร์" />
   }
@@ -850,7 +919,7 @@ function StaffSourceTab({ campaign }) {
         </div>
         <ChannelFields />
         <BankFields />
-        <button className="btn primary form-action" onClick={() => alert('เพิ่มรายชื่อแล้ว — สถานะ: รอหัวหน้าตรวจ')} type="button">+ เพิ่มรายชื่อ</button>
+        <button className="btn primary form-action" disabled={saving} onClick={handleAddInfluencer} type="button">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อเข้าฐานข้อมูล'}</button>
       </div>
       <div className="card">
         <div className="flex-between table-heading">
@@ -921,7 +990,46 @@ function BankFields() {
   )
 }
 
-function OwnerAddInfluencerForm() {
+function OwnerAddInfluencerForm({ campaign, refreshDashboardData }) {
+  const [saving, setSaving] = useState(false)
+
+  async function handleAddOwnerInfluencer(event) {
+    event.preventDefault()
+    const source = event.currentTarget.closest('.card')
+    const controls = Array.from(source.querySelectorAll('input, select'))
+
+    try {
+      setSaving(true)
+      await createInfluencer({
+        campaignId: campaign.id,
+        name: controls[0]?.value || '',
+        tier: controls[1]?.value || 'Nano',
+        followers: controls[2]?.value || '',
+        dealDate: controls[3]?.value || '',
+        instagram: controls[4]?.value || '',
+        tiktok: controls[5]?.value || '',
+        youtube: controls[6]?.value || '',
+        facebook: controls[7]?.value || '',
+        twitter: controls[8]?.value || '',
+        lemon8: controls[9]?.value || '',
+        addedBy: 'Owner',
+        addedByRole: 'owner',
+        status: 'owner_approved',
+        draft: 'waiting',
+        draftStatus: 'Waiting draft',
+      })
+      controls.forEach((control) => {
+        if (control.tagName === 'SELECT') control.selectedIndex = 0
+        else control.value = ''
+      })
+      await refreshDashboardData()
+    } catch (error) {
+      alert(`ยังเพิ่มรายชื่อไม่ได้: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="card block-gap">
       <div className="section-title">เพิ่มอินฟลูเอนเซอร์โดยหัวหน้า <span className="hint">ข้ามขั้นตอนทีม → เข้าสู่สถานะ owner_approved ทันที</span></div>
@@ -932,7 +1040,7 @@ function OwnerAddInfluencerForm() {
         <Field label="วันที่ดีลงานสำเร็จ" type="date" />
       </div>
       <ChannelFields />
-      <button className="btn primary" onClick={() => alert('เพิ่มรายชื่อโดยหัวหน้า → owner_approved ทันที')} type="button">+ เพิ่มรายชื่อ (หัวหน้า)</button>
+      <button className="btn primary" disabled={saving} onClick={handleAddOwnerInfluencer} type="button">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อ (หัวหน้า)'}</button>
     </div>
   )
 }
@@ -964,7 +1072,7 @@ function TierSummaryTable({ campaign }) {
   )
 }
 
-function ReviewCard({ rows, title, actionLabel, showSenior = false, onApprove, onReject }) {
+function ReviewCard({ rows, title, actionLabel, showSenior = false, onApprove, onReject, onAction }) {
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
@@ -1116,33 +1224,106 @@ function EditableTrackTable({ rows, refreshDashboardData }) {
   )
 }
 
-function Field({ label, options, type = 'text', value, placeholder }) {
+function Field({ label, name, options, required = false, type = 'text', value, placeholder }) {
   return (
     <div className="field">
       <label>{label}</label>
       {options
-        ? <select defaultValue={options[0]}>{options.map((option) => <option key={option}>{option}</option>)}</select>
-        : <input defaultValue={value} placeholder={placeholder} type={type} />}
+        ? <select defaultValue={options[0]} name={name} required={required}>{options.map((option) => <option key={option}>{option}</option>)}</select>
+        : <input defaultValue={value} name={name} placeholder={placeholder} required={required} type={type} />}
     </div>
   )
 }
 
-function MockupModal({ type, onClose }) {
+function MockupModal({ type, context, onClose, onSaved }) {
   const isBrand = type === 'brand'
+  const isCampaign = type === 'campaign'
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+
+    if (!isBrand && !isCampaign) {
+      alert('ส่วน Senior Reviewer ยังไม่ได้เชื่อมฐานข้อมูล')
+      onClose()
+      return
+    }
+
+    const formData = new FormData(event.currentTarget)
+
+    try {
+      setSaving(true)
+      if (isCampaign) {
+        await createCampaign({
+          brandId: context.brand.id,
+          name: formData.get('name'),
+          objective: formData.get('objective'),
+          target: formData.get('target'),
+          brandQuota: formData.get('brandQuota'),
+          startDate: formData.get('startDate'),
+          deadlineDate: formData.get('deadlineDate'),
+          briefFile: formData.get('briefFile'),
+          briefDate: formData.get('briefFile') ? new Date().toISOString().slice(0, 10) : null,
+          tierTargets: {
+            Nano: formData.get('tierNano'),
+            Micro: formData.get('tierMicro'),
+            Mid: formData.get('tierMid'),
+            Macro: formData.get('tierMacro'),
+            Mega: formData.get('tierMega'),
+          },
+        })
+        await onSaved?.()
+        onClose()
+        return
+      }
+      await createBrand({
+        name: formData.get('name'),
+        contact: formData.get('contact'),
+        category: formData.get('category'),
+        health: 'ใหม่',
+      })
+      await onSaved?.()
+      onClose()
+    } catch (error) {
+      alert(`ยังสร้างแบรนด์ไม่ได้: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
-      <div className="modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+      <form className="modal" onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit} role="dialog" aria-modal="true">
         <h2>{isBrand ? 'เพิ่มแบรนด์ใหม่' : 'เพิ่ม Senior Reviewer'}</h2>
         <div className="modal-sub">{isBrand ? 'กรอกข้อมูลแบรนด์เพื่อเริ่มสร้างแคมเปญ' : 'Senior จะสามารถช่วยตรวจรายชื่ออินฟลูก่อนส่งถึงหัวหน้า'}</div>
         {isBrand ? (
           <>
             <div className="grid cols-2">
-              <Field label="ชื่อแบรนด์" placeholder="เช่น SkinGlow Beauty" />
-              <Field label="ผู้ติดต่อ (Brand Manager)" placeholder="ชื่อผู้ติดต่อหลัก" />
-              <Field label="อีเมล" placeholder="contact@brand.com" type="email" />
-              <Field label="เบอร์โทร" placeholder="08x-xxx-xxxx" type="tel" />
+              <Field label="ชื่อแบรนด์" name="name" placeholder="เช่น SkinGlow Beauty" required />
+              <Field label="ผู้ติดต่อ (Brand Manager)" name="contact" placeholder="ชื่อผู้ติดต่อหลัก" />
+              <Field label="อีเมล" name="email" placeholder="contact@brand.com" type="email" />
+              <Field label="เบอร์โทร" name="phone" placeholder="08x-xxx-xxxx" type="tel" />
             </div>
-            <div className="modal-field"><Field label="หมายเหตุ / รายละเอียดเพิ่มเติม" placeholder="เช่น ประเภทสินค้า, กลุ่มเป้าหมาย" /></div>
+            <div className="modal-field"><Field label="หมายเหตุ / รายละเอียดเพิ่มเติม" name="category" placeholder="เช่น ประเภทสินค้า, กลุ่มเป้าหมาย" /></div>
+          </>
+        ) : isCampaign ? (
+          <>
+            <div className="grid cols-2">
+              <Field label="ชื่อแคมเปญ" name="name" placeholder="เช่น Summer Launch" required />
+              <Field label="เป้าหมายรวม" name="target" placeholder="เช่น 20" type="number" />
+              <Field label="โควต้าแบรนด์เลือก" name="brandQuota" placeholder="เช่น 15" type="number" />
+              <Field label="วัตถุประสงค์" name="objective" placeholder="เช่น Awareness / Conversion" />
+              <Field label="วันเริ่มลงคลิป" name="startDate" type="date" />
+              <Field label="วันครบกำหนด" name="deadlineDate" type="date" />
+            </div>
+            <div className="modal-field"><Field label="ชื่อไฟล์บรีฟ / URL บรีฟ" name="briefFile" placeholder="เช่น brief.pdf หรือ https://..." /></div>
+            <div className="grid cols-5">
+              <Field label="Nano" name="tierNano" type="number" value="0" />
+              <Field label="Micro" name="tierMicro" type="number" value="0" />
+              <Field label="Mid" name="tierMid" type="number" value="0" />
+              <Field label="Macro" name="tierMacro" type="number" value="0" />
+              <Field label="Mega" name="tierMega" type="number" value="0" />
+            </div>
           </>
         ) : (
           <div className="grid cols-2">
@@ -1154,9 +1335,9 @@ function MockupModal({ type, onClose }) {
         )}
         <div className="modal-actions">
           <button className="btn secondary" onClick={onClose} type="button">ยกเลิก</button>
-          <button className="btn primary" onClick={() => { alert(isBrand ? 'สร้างแบรนด์ใหม่แล้ว' : 'เพิ่ม Senior Reviewer แล้ว'); onClose() }} type="button">{isBrand ? 'สร้างแบรนด์' : 'บันทึก'}</button>
+          <button className="btn primary" disabled={saving} type="submit">{saving ? 'กำลังบันทึก...' : isBrand ? 'สร้างแบรนด์' : 'บันทึก'}</button>
         </div>
-      </div>
+      </form>
     </div>
   )
 }

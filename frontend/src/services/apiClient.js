@@ -60,6 +60,19 @@ export function getBrand(id) {
   return getJson(`/api/brands/${id}`)
 }
 
+export function createBrand(values) {
+  return sendJson('/api/brands', {
+    method: 'POST',
+    body: JSON.stringify(values),
+  })
+}
+
+export function deleteBrand(id) {
+  return sendJson(`/api/brands/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 export function getCampaigns() {
   return getJson('/api/campaigns')
 }
@@ -68,8 +81,22 @@ export function getCampaign(id) {
   return getJson(`/api/campaigns/${id}`)
 }
 
+export function createCampaign(values) {
+  return sendJson('/api/campaigns', {
+    method: 'POST',
+    body: JSON.stringify(values),
+  })
+}
+
 export function getInfluencers() {
   return getJson('/api/influencers')
+}
+
+export function createInfluencer(values) {
+  return sendJson('/api/influencers', {
+    method: 'POST',
+    body: JSON.stringify(values),
+  })
 }
 
 export function getTasks() {
