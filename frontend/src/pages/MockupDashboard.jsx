@@ -897,8 +897,8 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
 
   async function handleAddInfluencer(event) {
     event.preventDefault()
-    const formElement = event.currentTarget.tagName === 'FORM' ? event.currentTarget : event.currentTarget.closest('form')
-    if (!formElement) {
+    const formElement = event.currentTarget
+    if (!formElement || formElement.tagName !== 'FORM') {
       alert('ไม่พบฟอร์มสำหรับเพิ่มรายชื่อ')
       return
     }
@@ -959,7 +959,7 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
           })}
         </div>
       </div>
-      <div className="card block-gap">
+      <form className="card block-gap" onSubmit={handleAddInfluencer}>
         <div className="section-title">เพิ่มอินฟลูเอนเซอร์ใหม่</div>
         <div className="dup-banner">ระบบจะแจ้งเตือนหากช่องทางนี้มีคนในทีมเพิ่มไว้แล้ว เพื่อป้องกันการคัดซ้ำ</div>
         <div className="grid cols-4 block-gap">
@@ -970,8 +970,8 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
         </div>
         <ChannelFields />
         <BankFields />
-        <button className="btn primary form-action" disabled={saving} onClick={handleAddInfluencer} type="button">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อเข้าฐานข้อมูล'}</button>
-      </div>
+        <button className="btn primary form-action" disabled={saving} type="submit">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อเข้าฐานข้อมูล'}</button>
+      </form>
       <div className="card">
         <div className="flex-between table-heading">
           <div className="section-title no-margin">รายชื่อที่ทีมหามาแล้ว ({campaign.influencers.length})</div>
