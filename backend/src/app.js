@@ -328,8 +328,9 @@ export async function handleApiRequest(req, res) {
     const baseUrl = `http://${req.headers.host || 'localhost'}`
     const url = new URL(req.url, baseUrl)
     const pathParts = url.pathname.split('/').filter(Boolean)
-    const resource = pathParts[1]
-    const id = pathParts[2]
+    const startsWithApi = pathParts[0] === 'api'
+    const resource = startsWithApi ? pathParts[1] : pathParts[0]
+    const id = startsWithApi ? pathParts[2] : pathParts[1]
 
     if (resource === 'session') {
       if (req.method === 'GET' || req.method === 'POST') {
