@@ -1,6 +1,20 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardData, updateCampaign, updateInfluencer } from '../services/apiClient'
+import {
+  createBrand,
+  createCampaign,
+  createInfluencer,
+  createUser,
+  deleteBrand,
+  deleteUser,
+  getDashboardData,
+  getPermissions,
+  getSession,
+  updateBrand,
+  updateCampaign,
+  updateInfluencer,
+  updateUser,
+} from '../services/apiClient'
 
 const TIERS = ['Nano', 'Micro', 'Mid', 'Macro', 'Mega']
 const TIER_COLOR = {
@@ -16,6 +30,7 @@ const CH_CLASS = { instagram: 'ig', tiktok: 'tt', youtube: 'yt', facebook: 'fb',
 const THAI_BANKS = ['ธ.กสิกรไทย', 'ธ.กรุงเทพ', 'ธ.ไทยพาณิชย์', 'ธ.กรุงไทย', 'ธ.ทหารไทยธนชาต', 'Promptpay']
 
 const STATUS_MAP = {
+  sourced: { label: 'ยังไม่ส่งหัวหน้า', cls: 'muted' },
   pending_owner: { label: 'รอหัวหน้าตรวจ', cls: 'warning' },
   senior_approved: { label: 'Senior อนุมัติ · รอหัวหน้า', cls: 'purple' },
   owner_approved: { label: 'หัวหน้าคัดผ่าน · รอแบรนด์เลือก', cls: 'primary' },
@@ -145,10 +160,20 @@ const DB = {
 }
 
 const DashboardDataContext = createContext(DB)
+const SessionContext = createContext({ user: null, permissions: [] })
 const EMPTY_DASHBOARD_DATA = { brands: [], seniors: DB.seniors }
 
 function useDashboardData() {
   return useContext(DashboardDataContext)
+}
+
+function useSession() {
+  return useContext(SessionContext)
+}
+
+function useCan(permissionKey) {
+  const { permissions } = useSession()
+  return permissions.includes(permissionKey)
 }
 
 function totalTier(campaign, key) {
@@ -195,10 +220,66 @@ function DraftBadge({ draft }) {
 }
 
 function getChannels(item) {
-  if (item.channels?.length) return item.channels
+  if (item.channels?.length) return item.channels.filter((channel) => channel.url)
   if (!item.channel) return []
   const type = item.channel.includes('tiktok') ? 'tiktok' : item.channel.includes('youtube') ? 'youtube' : item.channel.includes('facebook') ? 'facebook' : 'instagram'
   return [{ type, url: item.channel }]
+}
+
+function normalizeExternalUrl(url) {
+  const value = String(url || '').trim()
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  return `https://${value.replace(/^\/+/, '')}`
+}
+
+function getBriefDownloadUrl(briefFile) {
+  const value = String(briefFile || '').trim()
+  if (!value) return '#'
+  if (/^https?:\/\//i.test(value) || value.includes('://')) {
+    return value
+  }
+  if (value.startsWith('/')) {
+    return value
+  }
+  if (value.startsWith('briefs/')) {
+    return `/${value.split('/').map(encodeURIComponent).join('/')}`
+  }
+  if (value.includes('/')) {
+    return normalizeExternalUrl(value)
+  }
+  return `/briefs/${encodeURIComponent(value)}`
+}
+
+function getChannelUrlsFromControls(controls, startIndex = 4, count = CHANNELS.length) {
+  return controls
+    .slice(startIndex, startIndex + count)
+    .map((control) => normalizeExternalUrl(control?.value || ''))
+    .filter(Boolean)
+}
+
+function hasDuplicateInfluencer(campaign, name, channelUrls) {
+  const normalizedName = String(name || '').trim().toLowerCase()
+  return campaign.influencers.some((item) => {
+    const existingName = String(item.name || '').trim().toLowerCase()
+    if (existingName && existingName === normalizedName) return true
+    const existingChannels = getChannels(item).map((channel) => normalizeExternalUrl(channel.url))
+    return channelUrls.some((url) => existingChannels.includes(url))
+  })
+}
+
+function getChannelUrl(item, type) {
+  return getChannels(item).find((channel) => channel.type === type)?.url || ''
+}
+
+function buildUpdatedChannels(item, values) {
+  const byType = new Map(getChannels(item).map((channel) => [channel.type, channel.url]))
+  Object.entries(values).forEach(([type, url]) => {
+    const value = String(url || '').trim()
+    if (value) byType.set(type, value)
+    else byType.delete(type)
+  })
+  return [...byType.entries()].map(([type, url]) => ({ type, url }))
 }
 
 function ChannelPills({ item }) {
@@ -206,11 +287,15 @@ function ChannelPills({ item }) {
   if (!channels.length) return <span className="muted-text">ไม่มีข้อมูล</span>
   return (
     <div className="channel-pills">
-      {channels.map((channel) => (
-        <span className={`ch-pill ${CH_CLASS[channel.type] || ''}`} key={`${channel.type}-${channel.url}`}>
+      {channels.map((channel) => {
+        const href = normalizeExternalUrl(channel.url)
+        if (!href) return null
+        return (
+        <a className={`ch-pill ${CH_CLASS[channel.type] || ''}`} href={href} key={`${channel.type}-${channel.url}`} rel="noopener noreferrer" target="_blank">
           {CH_LABEL[channel.type] || channel.type}
-        </span>
-      ))}
+        </a>
+        )
+      })}
     </div>
   )
 }
@@ -268,6 +353,7 @@ function getInitialRole() {
 function MockupDashboard() {
   const navigate = useNavigate()
   const [dashboardData, setDashboardData] = useState(EMPTY_DASHBOARD_DATA)
+  const [session, setSession] = useState({ user: null, permissions: [] })
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
   const [state, setState] = useState(() => {
@@ -284,12 +370,21 @@ function MockupDashboard() {
   useEffect(() => {
     let cancelled = false
 
-    getDashboardData()
-      .then((data) => {
-        if (!cancelled && data?.brands) {
-          setDashboardData({ brands: data.brands || [], seniors: data.seniors || DB.seniors })
-          setDataError('')
+    Promise.all([getSession(), getDashboardData()])
+      .then(([sessionData, data]) => {
+        if (cancelled) return
+        const user = sessionData?.user || null
+        const permissions = sessionData?.permissions || user?.permissions || []
+        setSession({ user, permissions })
+        localStorage.setItem('agencyhub-permissions', JSON.stringify(permissions))
+        if (user?.role) {
+          const nextRole = getInitialRole()
+          setState((current) => ({ ...current, role: nextRole, tab: nextRole === 'owner' ? 'review' : current.tab }))
         }
+        if (data?.brands) {
+          setDashboardData({ brands: data.brands || [], seniors: data.seniors || DB.seniors })
+        }
+        setDataError('')
       })
       .catch((error) => {
         if (!cancelled) setDataError(error.message)
@@ -316,6 +411,8 @@ function MockupDashboard() {
 
   function logout() {
     localStorage.removeItem('agencyhub-role')
+    localStorage.removeItem('agencyhub-user-id')
+    localStorage.removeItem('agencyhub-permissions')
     navigate('/login')
   }
 
@@ -330,6 +427,7 @@ function MockupDashboard() {
   const crumbs = getCrumbs(state)
 
   return (
+    <SessionContext.Provider value={session}>
     <DashboardDataContext.Provider value={dashboardData}>
       <div className="agency-mockup">
         <div className="mockup-app">
@@ -370,7 +468,7 @@ function MockupDashboard() {
             : <BrandCampaign campaign={getCampaign(dashboardData.brands[0].id, state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} refreshDashboardData={refreshDashboardData} />)}
 
           {state.role === 'owner' && (state.view === 'dashboard'
-            ? <OwnerDashboard allCampaigns={allCampaigns} go={go} openModal={setModal} />
+            ? <OwnerDashboard allCampaigns={allCampaigns} go={go} openModal={setModal} refreshDashboardData={refreshDashboardData} />
             : dashboardData.brands.length > 0 && state.view === 'brand'
               ? <OwnerBrand brand={getBrand(state.brandId)} go={go} openModal={setModal} refreshDashboardData={refreshDashboardData} />
               : <OwnerCampaign brand={getBrand(state.brandId)} campaign={getCampaign(state.brandId, state.campaignId)} state={state} go={go} openModal={setModal} refreshDashboardData={refreshDashboardData} />)}
@@ -385,6 +483,7 @@ function MockupDashboard() {
       </div>
     </div>
     </DashboardDataContext.Provider>
+    </SessionContext.Provider>
   )
 
   function getCrumbs(current) {
@@ -447,7 +546,7 @@ function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">
         {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}
-        {campaign.briefFile ? <> · <a className="link" href="#">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : null}
+        {campaign.briefFile ? <> · <a className="link" href={getBriefDownloadUrl(campaign.briefFile)} target="_blank" rel="noopener noreferrer">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : null}
       </p>
       <Tabs tabs={[['select', 'คัดเลือกอินฟลูเอนเซอร์'], ['progress', 'ความคืบหน้าการลงคลิป']]} active={state.tab} onChange={(tab) => go({ tab })} />
       {state.tab === 'select'
@@ -458,10 +557,11 @@ function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds
 }
 
 function BrandSelectTab({ campaign, refreshDashboardData, selectedCandidateIds, setSelectedCandidateIds }) {
+  const canSelect = useCan('influencer.brand_select')
   const selected = totalTier(campaign, 'brandSelected')
   const submitted = totalTier(campaign, 'sourced')
-  const candidates = campaign.influencers.filter((item) => item.status === 'owner_approved' || item.status === 'brand_selected')
-  const checkedCount = candidates.filter((item) => item.status === 'brand_selected' || selectedCandidateIds.has(item.id)).length
+  const candidates = campaign.influencers.filter((item) => item.status === 'owner_approved')
+  const checkedCount = campaign.influencers.filter((item) => item.status === 'brand_selected').length + candidates.filter((item) => selectedCandidateIds.has(item.id)).length
   const remaining = Math.max(0, campaign.brandQuota - checkedCount)
 
   function toggleCandidate(id) {
@@ -475,7 +575,7 @@ function BrandSelectTab({ campaign, refreshDashboardData, selectedCandidateIds, 
 
   async function confirmSelectedCandidates() {
     const ids = candidates
-      .filter((item) => selectedCandidateIds.has(item.id) && item.status !== 'brand_selected')
+      .filter((item) => selectedCandidateIds.has(item.id))
       .map((item) => item.id)
 
     if (!ids.length) {
@@ -484,6 +584,10 @@ function BrandSelectTab({ campaign, refreshDashboardData, selectedCandidateIds, 
     }
 
     try {
+      if (!canSelect) {
+        alert('ไม่มีสิทธิ์คัดเลือกอินฟลูเอนเซอร์')
+        return
+      }
       await Promise.all(ids.map((id) => updateInfluencer(id, { status: 'brand_selected' })))
       setSelectedCandidateIds(new Set())
       await refreshDashboardData()
@@ -506,17 +610,17 @@ function BrandSelectTab({ campaign, refreshDashboardData, selectedCandidateIds, 
       <div className="card">
         <div className="flex-between table-heading">
           <div className="section-title no-margin">รายชื่อรอการคัดเลือก <span className="hint">ติ๊กเพื่อเลือก / ยกเลิกการเลือก</span></div>
-          <button className="btn primary" onClick={confirmSelectedCandidates} type="button">ยืนยันรายชื่อที่เลือก</button>
+          {canSelect ? <button className="btn primary" onClick={confirmSelectedCandidates} type="button">ยืนยันรายชื่อที่เลือก</button> : null}
         </div>
         <div className="table-wrap">
           <table>
             <tbody>
               <tr><th></th><th>ชื่อ/ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>สถานะ</th></tr>
               {candidates.map((item) => {
-                const checked = item.status === 'brand_selected' || selectedCandidateIds.has(item.id)
+                const checked = selectedCandidateIds.has(item.id)
                 return (
                   <tr key={item.id}>
-                    <td><input checked={checked} disabled={!checked && checkedCount >= campaign.brandQuota} onChange={() => toggleCandidate(item.id)} type="checkbox" /></td>
+                    <td><input checked={checked} disabled={!canSelect || (!checked && checkedCount >= campaign.brandQuota)} onChange={() => toggleCandidate(item.id)} type="checkbox" /></td>
                     <td><div className="cell-name">{item.name}</div><ChannelPills item={item} /></td>
                     <td><TierBadge tier={item.tier} /></td>
                     <td className="followers">{item.followers}</td>
@@ -534,12 +638,13 @@ function BrandSelectTab({ campaign, refreshDashboardData, selectedCandidateIds, 
 }
 
 function BrandProgressTab({ campaign }) {
-  const rows = campaign.influencers.filter((item) => item.status === 'confirmed')
+  const rows = campaign.influencers.filter((item) => item.status === 'brand_selected' || item.status === 'confirmed')
   return <InfluencerProgressTable rows={rows} />
 }
 
-function OwnerDashboard({ allCampaigns, go, openModal }) {
+function OwnerDashboard({ allCampaigns, go, openModal, refreshDashboardData }) {
   const db = useDashboardData()
+  const canWriteBrand = useCan('brand.write')
   const sumTarget = allCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
   const sumConfirmed = allCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
   const pendingReview = allCampaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved').length, 0)
@@ -551,7 +656,7 @@ function OwnerDashboard({ allCampaigns, go, openModal }) {
           <h1 className="page-title">ภาพรวมทั้งหมด</h1>
           <p className="page-sub no-margin">สรุปทุกแบรนด์และแคมเปญที่กำลังดำเนินการ</p>
         </div>
-        <button className="btn primary" onClick={() => openModal('brand')} type="button">+ เพิ่มแบรนด์ใหม่</button>
+        {canWriteBrand ? <button className="btn primary" onClick={() => openModal('brand')} type="button">+ เพิ่มแบรนด์ใหม่</button> : null}
       </div>
       <div className="grid cols-4 block-gap owner-stats">
         <Stat label="แบรนด์ที่ดูแล" value={db.brands.length} />
@@ -559,7 +664,7 @@ function OwnerDashboard({ allCampaigns, go, openModal }) {
         <Stat label="อินฟลูยืนยันแล้ว / เป้า" value={sumConfirmed} sub={`/ ${sumTarget}`} />
         <Stat label="รอหัวหน้าตรวจ" value={pendingReview} tone="warning" />
       </div>
-      <SeniorReviewerPanel openModal={openModal} />
+      <SeniorReviewerPanel openModal={openModal} refreshDashboardData={refreshDashboardData} />
       <div className="section-title">รายชื่อแบรนด์</div>
       <div className="grid cols-2">
         {db.brands.map((brand) => {
@@ -577,19 +682,55 @@ function OwnerDashboard({ allCampaigns, go, openModal }) {
             </CampaignCard>
           )
         })}
-        <button className="add-brand-card" onClick={() => openModal('brand')} type="button"><span>+</span> เพิ่มแบรนด์ใหม่</button>
+        {canWriteBrand ? <button className="add-brand-card" onClick={() => openModal('brand')} type="button"><span>+</span> เพิ่มแบรนด์ใหม่</button> : null}
       </div>
     </>
   )
 }
 
-function SeniorReviewerPanel({ openModal }) {
+function SeniorReviewerPanel({ openModal, refreshDashboardData }) {
   const db = useDashboardData()
+  const canManageEmployees = useCan('employee.manage')
+  const canManagePermissions = useCan('permission.manage')
+
+  async function togglePermission(user, permissionKey) {
+    const currentPermissions = user.permissions || []
+    const permissions = currentPermissions.includes(permissionKey)
+      ? currentPermissions.filter((key) => key !== permissionKey)
+      : [...currentPermissions, permissionKey]
+
+    try {
+      await updateUser(user.id, { permissions })
+      await refreshDashboardData?.()
+    } catch (error) {
+      alert(`บันทึกสิทธิ์ไม่ได้: ${error.message}`)
+    }
+  }
+
+  async function disableUser(user) {
+    try {
+      await updateUser(user.id, { active: false })
+      await refreshDashboardData?.()
+    } catch (error) {
+      alert(`ปิดใช้งานพนักงานไม่ได้: ${error.message}`)
+    }
+  }
+
+  async function removeUser(user) {
+    if (!window.confirm(`ลบพนักงาน "${user.name}" หรือไม่?`)) return
+    try {
+      await deleteUser(user.id)
+      await refreshDashboardData?.()
+    } catch (error) {
+      alert(`ลบพนักงานไม่ได้: ${error.message}`)
+    }
+  }
+
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
         <div className="section-title no-margin">Senior Reviewer <span className="hint">ได้รับสิทธิ์ช่วยคัดเลือกก่อนถึงหัวหน้า</span></div>
-        <button className="btn secondary sm" onClick={() => openModal('senior')} type="button">จัดการสิทธิ์</button>
+        {canManageEmployees ? <button className="btn secondary sm" onClick={() => openModal('senior')} type="button">จัดการสิทธิ์</button> : null}
       </div>
       <div className="senior-list">
         {db.seniors.map((senior) => (
@@ -599,7 +740,10 @@ function SeniorReviewerPanel({ openModal }) {
               <div className="cell-name">{senior.name}</div>
               <div className="cell-sub">{senior.role}</div>
             </div>
-            <Badge cls="purple">✓ มีสิทธิ์คัด</Badge>
+            <Badge cls={senior.permissions?.includes('influencer.review') ? 'purple' : 'muted'}>{senior.permissions?.includes('influencer.review') ? '✓ มีสิทธิ์คัด' : 'ไม่มีสิทธิ์คัด'}</Badge>
+            {canManagePermissions ? <button className="btn xs secondary" onClick={() => togglePermission(senior, 'influencer.review')} type="button">{senior.permissions?.includes('influencer.review') ? 'ถอนสิทธิ์คัด' : 'ให้สิทธิ์คัด'}</button> : null}
+            {canManageEmployees && senior.id !== 'owner' ? <button className="btn xs secondary" onClick={() => disableUser(senior)} type="button">ปิดใช้งาน</button> : null}
+            {canManageEmployees && senior.id !== 'owner' ? <button className="btn xs danger-btn" onClick={() => removeUser(senior)} type="button">ลบ</button> : null}
           </div>
         ))}
       </div>
@@ -608,6 +752,22 @@ function SeniorReviewerPanel({ openModal }) {
 }
 
 function OwnerBrand({ brand, go, openModal, refreshDashboardData }) {
+  const canWriteBrand = useCan('brand.write')
+  const canDeleteBrand = useCan('brand.delete')
+  const canWriteCampaign = useCan('campaign.write')
+
+  async function handleEditBrand() {
+    const name = window.prompt('ชื่อแบรนด์', brand.name)
+    if (!name || name === brand.name) return
+
+    try {
+      await updateBrand(brand.id, { name })
+      await refreshDashboardData()
+    } catch (error) {
+      alert(`ยังแก้ไขแบรนด์ไม่ได้: ${error.message}`)
+    }
+  }
+
   async function handleDeleteBrand() {
     const confirmed = window.confirm(`ลบแบรนด์ "${brand.name}" และแคมเปญทั้งหมดของแบรนด์นี้หรือไม่?`)
     if (!confirmed) return
@@ -630,8 +790,9 @@ function OwnerBrand({ brand, go, openModal, refreshDashboardData }) {
         </div>
       </div>
       <div className="actions-inline block-gap">
-        <button className="btn danger-btn" onClick={handleDeleteBrand} type="button">ลบแบรนด์</button>
-        <button className="btn primary" onClick={() => openModal({ type: 'campaign', brand })} type="button">+ สร้างแคมเปญใหม่</button>
+        {canWriteBrand ? <button className="btn secondary" onClick={handleEditBrand} type="button">แก้ไขแบรนด์</button> : null}
+        {canDeleteBrand ? <button className="btn danger-btn" onClick={handleDeleteBrand} type="button">ลบแบรนด์</button> : null}
+        {canWriteCampaign ? <button className="btn primary" onClick={() => openModal({ type: 'campaign', brand })} type="button">+ สร้างแคมเปญใหม่</button> : null}
       </div>
       {!brand.campaigns.length ? (
         <EmptyState icon="แคมเปญ" title="ยังไม่มีแคมเปญของแบรนด์นี้" desc="กดสร้างแคมเปญใหม่เพื่อเริ่มเพิ่มข้อมูลจริงลง Database" />
@@ -662,7 +823,10 @@ function OwnerCampaign({ brand, campaign, state, go, openModal, refreshDashboard
   return (
     <>
       <h1 className="page-title">{campaign.name}</h1>
-      <p className="page-sub">{brand.name} · {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}</p>
+      <p className="page-sub">
+        {brand.name} · {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}
+        {campaign.briefFile ? <> · <a className="link" href={getBriefDownloadUrl(campaign.briefFile)} target="_blank" rel="noopener noreferrer">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : null}
+      </p>
       <Tabs tabs={[['review', 'ตรวจรายชื่อจากทีม'], ['setup', 'บรีฟ & เป้าหมาย'], ['prod', 'ภาพรวมการผลิตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
       {state.tab === 'review' ? <OwnerReviewTab campaign={campaign} refreshDashboardData={refreshDashboardData} /> : state.tab === 'setup' ? <OwnerSetupTab campaign={campaign} openModal={openModal} refreshDashboardData={refreshDashboardData} /> : <OwnerProductionTab campaign={campaign} />}
     </>
@@ -670,6 +834,9 @@ function OwnerCampaign({ brand, campaign, state, go, openModal, refreshDashboard
 }
 
 function OwnerReviewTab({ campaign, refreshDashboardData }) {
+  const canReview = useCan('influencer.review')
+  const canCreateInfluencer = useCan('influencer.create')
+  const [selectedReviewIds, setSelectedReviewIds] = useState(() => new Set())
   const pending = campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved')
   const approvedWaitingBrand = campaign.influencers.filter((item) => item.status === 'owner_approved')
   const selectedByBrand = campaign.influencers.filter((item) => item.status === 'brand_selected')
@@ -677,6 +844,10 @@ function OwnerReviewTab({ campaign, refreshDashboardData }) {
 
   async function patchInfluencer(id, values, successMessage) {
     try {
+      if (!canReview) {
+        alert('ไม่มีสิทธิ์ตรวจรายชื่อ')
+        return
+      }
       await updateInfluencer(id, values)
       await refreshDashboardData()
       alert(successMessage)
@@ -687,9 +858,66 @@ function OwnerReviewTab({ campaign, refreshDashboardData }) {
 
   async function confirmSelectedByBrand() {
     try {
+      if (!canReview) {
+        alert('ไม่มีสิทธิ์ยืนยันรายชื่อ')
+        return
+      }
       await Promise.all(selectedByBrand.map((item) => updateInfluencer(item.id, { status: 'confirmed' })))
       await refreshDashboardData()
       alert('ยืนยันรายชื่อสุดท้ายลง Database แล้ว')
+    } catch (error) {
+      alert(`ยังบันทึกไม่ได้: ${error.message}`)
+    }
+  }
+
+  async function approveSeniorApproved() {
+    const rows = pending.filter((item) => item.status === 'senior_approved')
+    if (!rows.length) return
+
+    try {
+      if (!canReview) {
+        alert('ไม่มีสิทธิ์ตรวจรายชื่อ')
+        return
+      }
+      await Promise.all(rows.map((item) => updateInfluencer(item.id, { status: 'owner_approved' })))
+      await refreshDashboardData()
+    } catch (error) {
+      alert(`ยังบันทึกไม่ได้: ${error.message}`)
+    }
+  }
+
+  function toggleReviewSelection(id) {
+    setSelectedReviewIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllReviewSelection() {
+    setSelectedReviewIds((current) => {
+      const selectableIds = pending.map((item) => item.id)
+      const allSelected = selectableIds.length > 0 && selectableIds.every((id) => current.has(id))
+      return new Set(allSelected ? [] : selectableIds)
+    })
+  }
+
+  async function approveSelectedForBrand() {
+    const rows = pending.filter((item) => selectedReviewIds.has(item.id))
+    if (!rows.length) {
+      alert('ยังไม่ได้เลือกรายชื่อ')
+      return
+    }
+
+    try {
+      if (!canReview) {
+        alert('ไม่มีสิทธิ์ตรวจรายชื่อ')
+        return
+      }
+      await Promise.all(rows.map((item) => updateInfluencer(item.id, { status: 'owner_approved' })))
+      setSelectedReviewIds(new Set())
+      await refreshDashboardData()
     } catch (error) {
       alert(`ยังบันทึกไม่ได้: ${error.message}`)
     }
@@ -703,23 +931,30 @@ function OwnerReviewTab({ campaign, refreshDashboardData }) {
         <Stat label="ส่งให้แบรนด์แล้ว" value={totalTier(campaign, 'ownerApproved')} />
         <Stat label="แบรนด์ยืนยันแล้ว" value={totalTier(campaign, 'brandSelected')} sub={`/ ${campaign.brandQuota}`} />
       </div>
-      <OwnerAddInfluencerForm campaign={campaign} refreshDashboardData={refreshDashboardData} />
-      <ReviewCard
+      {canCreateInfluencer ? <OwnerAddInfluencerForm campaign={campaign} refreshDashboardData={refreshDashboardData} /> : null}
+      {canReview ? <ReviewCard
         onApprove={(id) => patchInfluencer(id, { status: 'owner_approved' }, 'คัดผ่านและบันทึกลง Database แล้ว')}
         onReject={(id) => patchInfluencer(id, { status: 'owner_rejected' }, 'คัดออกและบันทึกลง Database แล้ว')}
         rows={pending}
         title={<>รายชื่อรอตรวจ ({pending.length}) {seniorApprovedCount ? <span className="senior-chip title-chip">✓ Senior อนุมัติแล้ว {seniorApprovedCount} คน</span> : null}</>}
-        actionLabel={pending.length ? 'ส่งที่อนุมัติให้แบรนด์' : ''}
+        actionLabel={selectedReviewIds.size ? 'ส่งที่เลือกให้แบรนด์' : seniorApprovedCount ? 'ส่งที่อนุมัติให้แบรนด์' : ''}
+        onAction={selectedReviewIds.size ? approveSelectedForBrand : approveSeniorApproved}
+        selectedIds={selectedReviewIds}
+        onToggleSelect={toggleReviewSelection}
+        onToggleSelectAll={toggleAllReviewSelection}
         showSenior
-      />
+      /> : null}
       <SimpleInfluencerCard rows={approvedWaitingBrand} title={`ส่งให้แบรนด์แล้ว — รอแบรนด์เลือก (${approvedWaitingBrand.length})`} />
-      <SimpleInfluencerCard rows={selectedByBrand} title={`แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})`} actionLabel={selectedByBrand.length ? 'ยืนยัน & แจ้งทีม' : ''} onAction={confirmSelectedByBrand} showBank />
+      <SimpleInfluencerCard rows={selectedByBrand} title={`แบรนด์เลือกแล้ว — รอยืนยันสุดท้าย (${selectedByBrand.length})`} actionLabel={canReview && selectedByBrand.length ? 'ยืนยัน & แจ้งทีม' : ''} onAction={confirmSelectedByBrand} showBank />
     </>
   )
 }
 
 function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
   const db = useDashboardData()
+  const canWriteCampaign = useCan('campaign.write')
+  const canManageEmployees = useCan('employee.manage')
+  const canManagePermissions = useCan('permission.manage')
   const [savingBrief, setSavingBrief] = useState(false)
 
   async function handleBriefSubmit(event) {
@@ -737,6 +972,10 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
     const currentVersion = Number(String(campaign.briefVersion || 'v0').replace(/\D/g, '')) || 0
 
     try {
+      if (!canWriteCampaign) {
+        alert('ไม่มีสิทธิ์แก้ไขแคมเปญ')
+        return
+      }
       setSavingBrief(true)
       await updateCampaign(campaign.id, {
         briefFile,
@@ -758,12 +997,12 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
         <form className="block-gap" onSubmit={handleBriefSubmit}>
           <div className="grid cols-2 block-gap">
             <div className="field">
-              <label>ไฟล์บรีฟ (.txt, .doc, .docx)</label>
+              <label>ไฟล์บรีฟ (.txt, .doc, .docx, .pdf)</label>
               <input accept=".txt,.doc,.docx,.pdf" name="briefFileUpload" type="file" />
             </div>
             <Field label="Google Doc / URL บรีฟ" name="briefUrl" placeholder="https://docs.google.com/..." type="url" />
           </div>
-          <button className="btn secondary" disabled={savingBrief} type="submit">{savingBrief ? 'กำลังบันทึก...' : campaign.briefFile ? 'บันทึกบรีฟเวอร์ชันใหม่' : 'บันทึกบรีฟ'}</button>
+          {canWriteCampaign ? <button className="btn secondary" disabled={savingBrief} type="submit">{savingBrief ? 'กำลังบันทึก...' : campaign.briefFile ? 'บันทึกบรีฟเวอร์ชันใหม่' : 'บันทึกบรีฟ'}</button> : null}
         </form>
       </div>
       <div className="grid cols-2">
@@ -775,7 +1014,7 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
                 <div className="cell-name">{campaign.briefFile}</div>
                 <div className="cell-sub">เวอร์ชัน {campaign.briefVersion} · อัปโหลดเมื่อ {campaign.briefDate}</div>
               </div>
-              <a className="link" href="#">ดาวน์โหลด</a>
+              <a className="link" href={getBriefDownloadUrl(campaign.briefFile)} target="_blank" rel="noopener noreferrer">ดาวน์โหลด</a>
             </div>
           ) : <EmptyState icon="เอกสาร" title="ยังไม่มีไฟล์บรีฟ" desc="อัปโหลดบรีฟเพื่อให้ทีมเริ่มหาอินฟลูได้" />}
           <button className="btn secondary" onClick={() => alert('เปิดหน้าต่างอัปโหลดบรีฟใหม่')} type="button">{campaign.briefFile ? 'อัปโหลดบรีฟเวอร์ชันใหม่' : 'อัปโหลดบรีฟ'}</button>
@@ -786,7 +1025,7 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
           <Field label="โควต้าที่แบรนด์เลือกได้สูงสุด" type="number" value={campaign.brandQuota} />
           <Field label="วันเริ่มลงคลิป" type="date" />
           <Field label="วันครบกำหนด" type="date" />
-          <button className="btn primary" onClick={() => alert('บันทึกการตั้งค่าแล้ว')} type="button">บันทึก</button>
+          {canWriteCampaign ? <button className="btn primary" onClick={() => alert('บันทึกการตั้งค่าแล้ว')} type="button">บันทึก</button> : null}
         </div>
       </div>
       <div className="card target-card">
@@ -808,18 +1047,18 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
             </div>
             <div className="permission-actions">
               <Badge cls="purple">✓ มีสิทธิ์อยู่</Badge>
-              <button className="btn sm danger-btn" onClick={() => alert('ถอนสิทธิ์')} type="button">ถอนสิทธิ์</button>
+              {canManagePermissions ? <button className="btn sm danger-btn" onClick={() => updateUser(senior.id, { permissions: (senior.permissions || []).filter((key) => key !== 'influencer.review') }).then(refreshDashboardData)} type="button">ถอนสิทธิ์</button> : null}
             </div>
           </div>
         ))}
-        <button className="btn secondary form-action" onClick={() => openModal('senior')} type="button">+ เพิ่ม Senior Reviewer</button>
+        {canManageEmployees ? <button className="btn secondary form-action" onClick={() => openModal('senior')} type="button">+ เพิ่ม Senior Reviewer</button> : null}
       </div>
     </>
   )
 }
 
 function OwnerProductionTab({ campaign }) {
-  const rows = campaign.influencers.filter((item) => item.status === 'confirmed')
+  const rows = campaign.influencers.filter((item) => item.status === 'brand_selected' || item.status === 'confirmed')
   const counts = { waiting: 0, review: 0, revise: 0, approved: 0, posted: 0 }
   rows.forEach((row) => { counts[row.draft] += 1 })
   return (
@@ -885,7 +1124,7 @@ function StaffCampaign({ brand, campaign, state, go, refreshDashboardData }) {
   return (
     <>
       <h1 className="page-title">{campaign.name}</h1>
-      <p className="page-sub">{brand.name} · {campaign.status} {campaign.briefFile ? <>· <a className="link" href="#">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : '· ยังไม่มีไฟล์บรีฟ'}</p>
+      <p className="page-sub">{brand.name} · {campaign.status} {campaign.briefFile ? <>· <a className="link" href={getBriefDownloadUrl(campaign.briefFile)} target="_blank" rel="noopener noreferrer">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : '· ยังไม่มีไฟล์บรีฟ'}</p>
       <Tabs tabs={[['source', 'หาอินฟลูเอนเซอร์'], ['track', 'ติดตามงาน / อัปเดตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
       {state.tab === 'source' ? <StaffSourceTab campaign={campaign} refreshDashboardData={refreshDashboardData} /> : <StaffTrackTab campaign={campaign} refreshDashboardData={refreshDashboardData} />}
     </>
@@ -893,7 +1132,56 @@ function StaffCampaign({ brand, campaign, state, go, refreshDashboardData }) {
 }
 
 function StaffSourceTab({ campaign, refreshDashboardData }) {
+  const { user } = useSession()
+  const canCreateInfluencer = useCan('influencer.create')
   const [saving, setSaving] = useState(false)
+  const [selectedInfluencerIds, setSelectedInfluencerIds] = useState(() => new Set())
+  const [editingInfluencer, setEditingInfluencer] = useState(null)
+  const lockedSourceStatuses = ['pending_owner', 'senior_approved', 'owner_approved', 'brand_selected', 'confirmed']
+
+  function toggleInfluencerSelection(id) {
+    const target = campaign.influencers.find((item) => item.id === id)
+    if (!target || lockedSourceStatuses.includes(target.status)) return
+
+    setSelectedInfluencerIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllInfluencerSelection() {
+    const selectableIds = campaign.influencers
+      .filter((item) => !lockedSourceStatuses.includes(item.status))
+      .map((item) => item.id)
+    const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedInfluencerIds.has(id))
+    setSelectedInfluencerIds(new Set(allSelected ? [] : selectableIds))
+  }
+
+  async function sendSelectedToOwner() {
+    const ids = campaign.influencers
+      .filter((item) => selectedInfluencerIds.has(item.id) && !lockedSourceStatuses.includes(item.status))
+      .map((item) => item.id)
+
+    if (!ids.length) {
+      alert('ยังไม่ได้เลือกรายชื่อ')
+      return
+    }
+
+    try {
+      if (!canCreateInfluencer) {
+        alert('ไม่มีสิทธิ์ส่งรายชื่อให้หัวหน้า')
+        return
+      }
+      await Promise.all(ids.map((id) => updateInfluencer(id, { status: 'pending_owner' })))
+      setSelectedInfluencerIds(new Set())
+      await refreshDashboardData()
+      alert('ส่งรายชื่อให้หัวหน้าตรวจแล้ว')
+    } catch (error) {
+      alert(`ยังส่งให้หัวหน้าตรวจไม่ได้: ${error.message}`)
+    }
+  }
 
   async function handleAddInfluencer(event) {
     event.preventDefault()
@@ -907,10 +1195,20 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
     const getValue = (name, index) => formData.get(name) || controls[index]?.value || ''
 
     try {
+      if (!canCreateInfluencer) {
+        alert('ไม่มีสิทธิ์เพิ่มอินฟลูเอนเซอร์')
+        return
+      }
+      const influencerName = getValue('name', 0).trim()
+      const channelUrls = getChannelUrlsFromControls(controls, 4, CHANNELS.length)
+      if (hasDuplicateInfluencer(campaign, influencerName, channelUrls)) {
+        alert('ไม่สามารถบันทึกได้ เนื่องจากพบอินฟลูเอนเซอร์นี้ในแคมเปญแล้ว')
+        return
+      }
       setSaving(true)
       await createInfluencer({
         campaignId: campaign.id,
-        name: getValue('name', 0),
+        name: influencerName,
         tier: getValue('tier', 1),
         followers: getValue('followers', 2),
         dealDate: getValue('dealDate', 3),
@@ -923,9 +1221,9 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
         bankName: getValue('bankName', 10),
         bankAccount: getValue('bankAccount', 11),
         bankOwner: getValue('bankOwner', 12),
-        addedBy: 'Staff',
-        addedByRole: 'staff',
-        status: 'pending_owner',
+        addedBy: user?.name || 'Staff',
+        addedByRole: user?.role || 'staff',
+        status: 'sourced',
         draft: 'waiting',
         draftStatus: 'Waiting draft',
       })
@@ -959,7 +1257,7 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
           })}
         </div>
       </div>
-      <form className="card block-gap" onSubmit={handleAddInfluencer}>
+      {canCreateInfluencer ? <form className="card block-gap" onSubmit={handleAddInfluencer}>
         <div className="section-title">เพิ่มอินฟลูเอนเซอร์ใหม่</div>
         <div className="dup-banner">ระบบจะแจ้งเตือนหากช่องทางนี้มีคนในทีมเพิ่มไว้แล้ว เพื่อป้องกันการคัดซ้ำ</div>
         <div className="grid cols-4 block-gap">
@@ -971,21 +1269,42 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
         <ChannelFields />
         <BankFields />
         <button className="btn primary form-action" disabled={saving} type="submit">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อเข้าฐานข้อมูล'}</button>
-      </form>
+      </form> : null}
       <div className="card">
         <div className="flex-between table-heading">
           <div className="section-title no-margin">รายชื่อที่ทีมหามาแล้ว ({campaign.influencers.length})</div>
-          <button className="btn primary" onClick={() => alert('ส่งรายชื่อทั้งหมดให้หัวหน้าตรวจแล้ว')} type="button">ส่งให้หัวหน้าตรวจ</button>
         </div>
-        <InfluencerListTable rows={campaign.influencers} staffMode />
+        <div className="permission-actions">
+          {canCreateInfluencer ? <button className="btn primary" onClick={sendSelectedToOwner} type="button">{selectedInfluencerIds.size ? `ส่งที่เลือก (${selectedInfluencerIds.size})` : 'ส่งรายชื่อที่เลือกให้หัวหน้าตรวจ'}</button> : null}
+        </div>
+        <InfluencerListTable
+          onEditInfluencer={setEditingInfluencer}
+          onToggleSelect={toggleInfluencerSelection}
+          onToggleSelectAll={toggleAllInfluencerSelection}
+          refreshDashboardData={refreshDashboardData}
+          rows={campaign.influencers}
+          selectedIds={selectedInfluencerIds}
+          staffEditable
+          staffMode
+        />
         <div className="muted-text table-note">* แถวสีจางคือรายชื่อที่เพื่อนในทีมเพิ่มไว้ — ดูได้อย่างเดียว แก้ไขไม่ได้ เพื่อป้องกันข้อมูลชนกัน</div>
       </div>
+      {editingInfluencer ? (
+        <StaffInfluencerEditModal
+          influencer={editingInfluencer}
+          onClose={() => setEditingInfluencer(null)}
+          onSaved={async () => {
+            setEditingInfluencer(null)
+            await refreshDashboardData()
+          }}
+        />
+      ) : null}
     </>
   )
 }
 
 function StaffTrackTab({ campaign, refreshDashboardData }) {
-  const rows = campaign.influencers.filter((item) => item.status === 'confirmed')
+  const rows = campaign.influencers.filter((item) => item.status === 'brand_selected' || item.status === 'confirmed')
   if (!rows.length) return <EmptyState icon="งาน" title="ยังไม่มีรายชื่อที่ถูกยืนยัน" desc="เมื่อหัวหน้ายืนยันรายชื่อสุดท้ายจากแบรนด์ รายชื่อจะมาแสดงที่นี่เพื่อให้อัปเดตงานได้" />
   return (
     <>
@@ -1041,7 +1360,88 @@ function BankFields() {
   )
 }
 
+function StaffInfluencerEditModal({ influencer, onClose, onSaved }) {
+  const [saving, setSaving] = useState(false)
+  const bankOwner = influencer.bank?.owner || influencer.bank?.holder || ''
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const bankName = String(formData.get('bankName') || '').trim()
+    const bankAccount = String(formData.get('bankAccount') || '').trim()
+    const bankHolder = String(formData.get('bankHolder') || '').trim()
+    const bank = bankName || bankAccount || bankHolder
+      ? { name: bankName, account: bankAccount, owner: bankHolder, holder: bankHolder }
+      : null
+
+    try {
+      setSaving(true)
+      await updateInfluencer(influencer.id, {
+        name: formData.get('name'),
+        tier: formData.get('tier'),
+        followers: formData.get('followers'),
+        dealDate: formData.get('dealDate'),
+        channels: buildUpdatedChannels(influencer, {
+          instagram: formData.get('instagram'),
+          tiktok: formData.get('tiktok'),
+          youtube: formData.get('youtube'),
+          facebook: formData.get('facebook'),
+          twitter: formData.get('twitter'),
+          lemon8: formData.get('lemon8'),
+        }),
+        bank,
+      })
+      await onSaved?.()
+    } catch (error) {
+      alert(`ยังแก้ไขข้อมูลอินฟลูไม่ได้: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose} role="presentation">
+      <form className="modal" onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit} role="dialog" aria-modal="true">
+        <h2>แก้ไขข้อมูลอินฟลู</h2>
+        <div className="modal-sub">{influencer.name}</div>
+        <div className="grid cols-2">
+          <Field label="ชื่ออินฟลูเอนเซอร์" name="name" required value={influencer.name} />
+          <div className="field">
+            <label>ระดับ</label>
+            <select defaultValue={influencer.tier || TIERS[0]} name="tier">
+              {TIERS.map((tier) => <option key={tier}>{tier}</option>)}
+            </select>
+          </div>
+          <Field label="ผู้ติดตาม" name="followers" value={influencer.followers} />
+          <Field label="วันที่ดีลงานสำเร็จ" name="dealDate" type="date" value={influencer.dealDate} />
+        </div>
+        <div className="section-title mini-title">ช่องทางลงคลิป</div>
+        <div className="grid cols-3 block-gap">
+          <Field label="IG" name="instagram" value={getChannelUrl(influencer, 'instagram')} />
+          <Field label="TikTok" name="tiktok" value={getChannelUrl(influencer, 'tiktok')} />
+          <Field label="YT" name="youtube" value={getChannelUrl(influencer, 'youtube')} />
+          <Field label="FB" name="facebook" value={getChannelUrl(influencer, 'facebook')} />
+          <Field label="X" name="twitter" value={getChannelUrl(influencer, 'twitter')} />
+          <Field label="Lemon8" name="lemon8" value={getChannelUrl(influencer, 'lemon8')} />
+        </div>
+        <div className="section-title mini-title">ข้อมูลธนาคาร</div>
+        <div className="grid cols-3 block-gap">
+          <Field label="ธนาคาร" name="bankName" value={influencer.bank?.name || ''} />
+          <Field label="เลขบัญชี / Promptpay" name="bankAccount" value={influencer.bank?.account || ''} />
+          <Field label="ชื่อเจ้าของบัญชี" name="bankHolder" value={bankOwner} />
+        </div>
+        <div className="modal-actions">
+          <button className="btn secondary" onClick={onClose} type="button">ยกเลิก</button>
+          <button className="btn primary" disabled={saving} type="submit">{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function OwnerAddInfluencerForm({ campaign, refreshDashboardData }) {
+  const { user } = useSession()
+  const canCreateInfluencer = useCan('influencer.create')
   const [saving, setSaving] = useState(false)
 
   async function handleAddOwnerInfluencer(event) {
@@ -1050,10 +1450,20 @@ function OwnerAddInfluencerForm({ campaign, refreshDashboardData }) {
     const controls = Array.from(source.querySelectorAll('input, select'))
 
     try {
+      if (!canCreateInfluencer) {
+        alert('ไม่มีสิทธิ์เพิ่มอินฟลูเอนเซอร์')
+        return
+      }
+      const influencerName = String(controls[0]?.value || '').trim()
+      const channelUrls = getChannelUrlsFromControls(controls, 4, CHANNELS.length)
+      if (hasDuplicateInfluencer(campaign, influencerName, channelUrls)) {
+        alert('ไม่สามารถบันทึกได้ เนื่องจากพบอินฟลูเอนเซอร์นี้ในแคมเปญแล้ว')
+        return
+      }
       setSaving(true)
       await createInfluencer({
         campaignId: campaign.id,
-        name: controls[0]?.value || '',
+        name: influencerName,
         tier: controls[1]?.value || 'Nano',
         followers: controls[2]?.value || '',
         dealDate: controls[3]?.value || '',
@@ -1063,8 +1473,8 @@ function OwnerAddInfluencerForm({ campaign, refreshDashboardData }) {
         facebook: controls[7]?.value || '',
         twitter: controls[8]?.value || '',
         lemon8: controls[9]?.value || '',
-        addedBy: 'Owner',
-        addedByRole: 'owner',
+        addedBy: user?.name || 'Owner',
+        addedByRole: user?.role || 'owner',
         status: 'owner_approved',
         draft: 'waiting',
         draftStatus: 'Waiting draft',
@@ -1091,7 +1501,7 @@ function OwnerAddInfluencerForm({ campaign, refreshDashboardData }) {
         <Field label="วันที่ดีลงานสำเร็จ" type="date" />
       </div>
       <ChannelFields />
-      <button className="btn primary" disabled={saving} onClick={handleAddOwnerInfluencer} type="button">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อ (หัวหน้า)'}</button>
+      {canCreateInfluencer ? <button className="btn primary" disabled={saving} onClick={handleAddOwnerInfluencer} type="button">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อ (หัวหน้า)'}</button> : null}
     </div>
   )
 }
@@ -1123,20 +1533,27 @@ function TierSummaryTable({ campaign }) {
   )
 }
 
-function ReviewCard({ rows, title, actionLabel, showSenior = false, onApprove, onReject, onAction }) {
+function ReviewCard({ rows, title, actionLabel, showSenior = false, onApprove, onReject, onAction, selectedIds, onToggleSelect, onToggleSelectAll }) {
+  const selectable = Boolean(selectedIds && onToggleSelect)
+  const allSelected = selectable && rows.length > 0 && rows.every((row) => selectedIds.has(row.id))
+
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
         <div className="section-title no-margin">{title}</div>
-        {actionLabel ? <button className="btn primary" onClick={() => alert('ส่งรายชื่อที่อนุมัติทั้งหมดให้แบรนด์แล้ว')} type="button">{actionLabel}</button> : null}
+        {actionLabel ? <button className="btn primary" onClick={onAction} type="button">{actionLabel}</button> : null}
       </div>
       {rows.length === 0 ? <EmptyState icon="เรียบร้อย" title="ไม่มีรายชื่อรอตรวจ" desc="ทีมยังไม่ส่งรายชื่อใหม่เข้ามาในขณะนี้" /> : (
         <div className="table-wrap">
           <table>
             <tbody>
-              <tr><th>ชื่อ / ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th>{showSenior ? <th>Senior</th> : null}<th>การตัดสิน</th></tr>
+              <tr>
+                {selectable ? <th><input checked={allSelected} onChange={onToggleSelectAll} type="checkbox" /></th> : null}
+                <th>ชื่อ / ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th>{showSenior ? <th>Senior</th> : null}<th>การตัดสิน</th>
+              </tr>
               {rows.map((item) => (
                 <tr key={item.id}>
+                  {selectable ? <td><input checked={selectedIds.has(item.id)} onChange={() => onToggleSelect(item.id)} type="checkbox" /></td> : null}
                   <td><div className="cell-name">{item.name}</div><ChannelPills item={item} /></td>
                   <td><TierBadge tier={item.tier} /></td>
                   <td className="followers">{item.followers}</td>
@@ -1168,22 +1585,32 @@ function SimpleInfluencerCard({ rows, title, actionLabel, showBank = false, onAc
   )
 }
 
-function InfluencerListTable({ rows, staffMode = false, showBank = false }) {
+function InfluencerListTable({ rows, staffMode = false, showBank = false, staffEditable = false, refreshDashboardData, selectedIds, onToggleSelect, onToggleSelectAll, onEditInfluencer }) {
+  const canEditInfluencer = useCan('influencer.create')
+  const { user } = useSession()
+  const selectable = Boolean(selectedIds && onToggleSelect)
+  const selectableRows = rows.filter((row) => row.status !== 'owner_approved')
+  const allSelected = selectable && selectableRows.length > 0 && selectableRows.every((row) => selectedIds.has(row.id))
+
   return (
     <div className="table-wrap">
       <table>
         <tbody>
           <tr>
+            {selectable ? <th><input checked={allSelected} onChange={onToggleSelectAll} type="checkbox" /></th> : null}
             <th>ชื่อ / ช่องทาง</th><th>ระดับ</th><th>ผู้ติดตาม</th><th>เพิ่มโดย</th>
             {staffMode ? <th>วันดีลงาน</th> : null}
             {(staffMode || showBank) ? <th>ธนาคาร</th> : null}
             {staffMode ? <th>Senior</th> : null}
             <th>สถานะ</th>
+            {staffEditable ? <th>แก้ไข</th> : null}
           </tr>
           {rows.map((item) => {
-            const isMine = item.addedBy === CURRENT_STAFF
+            const isReviewSent = ['pending_owner', 'senior_approved', 'owner_approved', 'brand_selected', 'confirmed'].includes(item.status)
+            const isMine = item.addedBy === user?.name || item.addedBy === CURRENT_STAFF
             return (
-              <tr className={staffMode && !isMine ? 'row-muted' : ''} key={item.id}>
+              <tr className={staffMode && isReviewSent ? 'row-muted' : ''} key={item.id}>
+                {selectable ? <td><input checked={selectedIds.has(item.id)} disabled={isReviewSent} onChange={() => onToggleSelect(item.id)} type="checkbox" /></td> : null}
                 <td>
                   <div className="cell-name">
                     {item.name} {item.addedByRole === 'owner' ? <Badge cls="purple">หัวหน้าเพิ่ม</Badge> : null}
@@ -1197,6 +1624,7 @@ function InfluencerListTable({ rows, staffMode = false, showBank = false }) {
                 {(staffMode || showBank) ? <td><BankChip bank={item.bank} /></td> : null}
                 {staffMode ? <td><SeniorChip approval={item.seniorApproval} /></td> : null}
                 <td><StatusBadge status={item.status} /></td>
+                {staffEditable ? <td>{canEditInfluencer && !isReviewSent ? <button className="btn xs secondary" onClick={() => onEditInfluencer?.(item)} type="button">แก้ไข</button> : null}</td> : null}
               </tr>
             )
           })}
@@ -1214,7 +1642,7 @@ function InfluencerProgressTable({ rows, title = 'รายชื่อที่
         <table>
           <tbody>
             <tr>
-              <th>ชื่อ / ช่องทาง</th><th>ระดับ</th>{withOwner ? <th>ผู้ดูแล</th> : null}<th>วันดีลงาน</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th>
+              <th>ชื่อ / ช่องทาง</th><th>ระดับ</th>{withOwner ? <th>ผู้ดูแล</th> : null}<th>วันดีลงาน</th><th>สถานะงาน</th><th>สถานะดราฟ/คลิป</th><th>วันที่ลง</th><th>ลิงก์คลิป</th>
               {withOwner ? <><th>Asset</th><th>ธนาคาร</th></> : null}
             </tr>
             {rows.map((item) => (
@@ -1223,6 +1651,7 @@ function InfluencerProgressTable({ rows, title = 'รายชื่อที่
                 <td><TierBadge tier={item.tier} /></td>
                 {withOwner ? <td>{item.addedBy}</td> : null}
                 <td>{item.dealDate}</td>
+                <td><StatusBadge status={item.status} /></td>
                 <td><DraftBadge draft={item.draft} /></td>
                 <td>{item.postDate}</td>
                 <td>{item.postLink ? <a className="link" href="#">ดูคลิป</a> : <span className="muted-text">—</span>}</td>
@@ -1238,8 +1667,14 @@ function InfluencerProgressTable({ rows, title = 'รายชื่อที่
 }
 
 function EditableTrackTable({ rows, refreshDashboardData }) {
+  const canTrack = useCan('influencer.track')
+
   async function saveInfluencer(id, values) {
     try {
+      if (!canTrack) {
+        alert('ไม่มีสิทธิ์อัปเดตงาน')
+        return
+      }
       await updateInfluencer(id, values)
       await refreshDashboardData()
     } catch (error) {
@@ -1259,13 +1694,13 @@ function EditableTrackTable({ rows, refreshDashboardData }) {
               <td>{item.dealDate}</td>
               <td><input defaultChecked={item.draft !== 'waiting'} type="checkbox" /></td>
               <td>
-                <select className="draft-select" defaultValue={item.draft} onChange={(event) => saveInfluencer(item.id, { draft: event.target.value })}>
+                <select className="draft-select" defaultValue={item.draft} disabled={!canTrack} onChange={(event) => saveInfluencer(item.id, { draft: event.target.value })}>
                   {Object.entries(DRAFT_MAP).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
                 </select>
               </td>
-              <td><input className="compact-input" defaultValue={item.draft === 'posted' ? '2026-07-05' : ''} onBlur={(event) => saveInfluencer(item.id, { postDate: event.target.value })} type="date" /></td>
-              <td><input className="link-input small" defaultValue={item.postLink} onBlur={(event) => saveInfluencer(item.id, { postLink: event.target.value })} placeholder="ลิงก์คลิป" type="text" /></td>
-              <td><input className="link-input" defaultValue={item.assetLink} onBlur={(event) => saveInfluencer(item.id, { assetLink: event.target.value })} placeholder="ลิงก์ Asset (Drive/Dropbox)" type="text" /></td>
+              <td><input className="compact-input" defaultValue={item.draft === 'posted' ? '2026-07-05' : ''} disabled={!canTrack} onBlur={(event) => saveInfluencer(item.id, { postDate: event.target.value })} type="date" /></td>
+              <td><input className="link-input small" defaultValue={item.postLink} disabled={!canTrack} onBlur={(event) => saveInfluencer(item.id, { postLink: event.target.value })} placeholder="ลิงก์คลิป" type="text" /></td>
+              <td><input className="link-input" defaultValue={item.assetLink} disabled={!canTrack} onBlur={(event) => saveInfluencer(item.id, { assetLink: event.target.value })} placeholder="ลิงก์ Asset (Drive/Dropbox)" type="text" /></td>
               <td>{item.bank ? <BankChip bank={item.bank} /> : <button className="btn xs secondary" onClick={() => alert('เปิดฟอร์มใส่ข้อมูลธนาคาร')} type="button">+ ใส่ธนาคาร</button>}</td>
             </tr>
           ))}
@@ -1289,16 +1724,27 @@ function Field({ label, name, options, required = false, type = 'text', value, p
 function MockupModal({ type, context, onClose, onSaved }) {
   const isBrand = type === 'brand'
   const isCampaign = type === 'campaign'
+  const isEmployee = type === 'senior'
   const [saving, setSaving] = useState(false)
+  const [permissionOptions, setPermissionOptions] = useState([])
+
+  useEffect(() => {
+    if (!isEmployee) return undefined
+    let cancelled = false
+    getPermissions()
+      .then((items) => {
+        if (!cancelled) setPermissionOptions(items || [])
+      })
+      .catch(() => {
+        if (!cancelled) setPermissionOptions([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isEmployee])
 
   async function handleSubmit(event) {
     event.preventDefault()
-
-    if (!isBrand && !isCampaign) {
-      alert('ส่วน Senior Reviewer ยังไม่ได้เชื่อมฐานข้อมูล')
-      onClose()
-      return
-    }
 
     const formData = new FormData(event.currentTarget)
 
@@ -1330,6 +1776,18 @@ function MockupModal({ type, context, onClose, onSaved }) {
         onClose()
         return
       }
+      if (isEmployee) {
+        await createUser({
+          name: formData.get('name'),
+          title: formData.get('title'),
+          email: formData.get('email'),
+          role: 'staff',
+          permissions: formData.getAll('permissions'),
+        })
+        await onSaved?.()
+        onClose()
+        return
+      }
       await createBrand({
         name: formData.get('name'),
         contact: formData.get('contact'),
@@ -1348,7 +1806,7 @@ function MockupModal({ type, context, onClose, onSaved }) {
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
       <form className="modal" onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit} role="dialog" aria-modal="true">
-        <h2>{isBrand ? 'เพิ่มแบรนด์ใหม่' : 'เพิ่ม Senior Reviewer'}</h2>
+        <h2>{isBrand ? 'เพิ่มแบรนด์ใหม่' : isEmployee ? 'เพิ่ม Senior Reviewer' : 'เพิ่มแคมเปญใหม่'}</h2>
         <div className="modal-sub">{isBrand ? 'กรอกข้อมูลแบรนด์เพื่อเริ่มสร้างแคมเปญ' : 'Senior จะสามารถช่วยตรวจรายชื่ออินฟลูก่อนส่งถึงหัวหน้า'}</div>
         {isBrand ? (
           <>
@@ -1373,7 +1831,7 @@ function MockupModal({ type, context, onClose, onSaved }) {
             <div className="modal-field"><Field label="ชื่อไฟล์บรีฟ / URL บรีฟ" name="briefFile" placeholder="เช่น brief.pdf หรือ https://..." /></div>
             <div className="grid cols-2 block-gap">
               <div className="field">
-                <label>ไฟล์บรีฟ (.txt, .doc, .docx)</label>
+                <label>ไฟล์บรีฟ (.txt, .doc, .docx, .pdf)</label>
                 <input accept=".txt,.doc,.docx,.pdf" name="briefFileUpload" type="file" />
               </div>
               <Field label="Google Doc / URL บรีฟ" name="briefFile" placeholder="https://docs.google.com/..." type="url" />
@@ -1386,13 +1844,25 @@ function MockupModal({ type, context, onClose, onSaved }) {
               <Field label="Mega" name="tierMega" type="number" value="0" />
             </div>
           </>
-        ) : (
+        ) : isEmployee ? (
           <div className="grid cols-2">
-            <Field label="ชื่อพนักงาน" placeholder="ชื่อ-นามสกุล" />
-            <Field label="ตำแหน่ง" placeholder="เช่น Senior Coordinator" />
-            <Field label="อีเมล" placeholder="staff@agency.com" type="email" />
-            <Field label="ระดับสิทธิ์" options={['ตรวจรายชื่อ + Approve เบื้องต้น', 'ตรวจรายชื่อเท่านั้น (ไม่ Approve)']} />
+            <Field label="ชื่อพนักงาน" name="name" placeholder="ชื่อ-นามสกุล" required />
+            <Field label="ตำแหน่ง" name="title" placeholder="เช่น Senior Coordinator" />
+            <Field label="อีเมล" name="email" placeholder="staff@agency.com" type="email" />
+            <div className="field">
+              <label>สิทธิ์</label>
+              <div className="permission-actions">
+                {permissionOptions.map((permission) => (
+                  <label className="role-chip" key={permission.key}>
+                    <input defaultChecked={['brand.read', 'influencer.review'].includes(permission.key)} name="permissions" type="checkbox" value={permission.key} />
+                    {permission.key}
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
+        ) : (
+          <div />
         )}
         <div className="modal-actions">
           <button className="btn secondary" onClick={onClose} type="button">ยกเลิก</button>

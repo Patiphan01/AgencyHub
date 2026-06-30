@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
-import { getRoles } from '../services/apiClient'
+import { getRoles, loginSession } from '../services/apiClient'
 
 const fallbackRoles = ['Brand', 'Owner', 'Staff']
 
@@ -32,10 +32,23 @@ function Login() {
     }
   }, [])
 
-  function handleLogin(event) {
+  async function handleLogin(event) {
     event.preventDefault()
-    localStorage.setItem('agencyhub-role', selectedRole)
-    navigate('/dashboard')
+    const formData = new FormData(event.currentTarget)
+
+    try {
+      const session = await loginSession({
+        username: formData.get('username') || selectedRole,
+        role: selectedRole,
+      })
+      const user = session.user
+      localStorage.setItem('agencyhub-role', user.role || selectedRole)
+      localStorage.setItem('agencyhub-user-id', user.id)
+      localStorage.setItem('agencyhub-permissions', JSON.stringify(user.permissions || []))
+      navigate('/dashboard')
+    } catch (error) {
+      alert(`เข้าสู่ระบบไม่ได้: ${error.message}`)
+    }
   }
 
   return (

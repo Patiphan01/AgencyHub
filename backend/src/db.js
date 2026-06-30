@@ -102,12 +102,34 @@ export async function getRowById(tableName, id) {
 export async function getDashboardRows() {
   const sql = await getSql()
   if (!sql) return null
+  await ensureAuthSchema()
 
-  const [brandRows, campaignRows, influencerRows, tierRows] = await Promise.all([
+  const [brandRows, campaignRows, influencerRows, tierRows, userRows] = await Promise.all([
     sql`select * from brands order by id`,
     sql`select * from campaigns order by id`,
     sql`select * from influencers order by id`,
     sql`select * from tier_targets order by id`,
+    sql`
+      select u.*, coalesce(
+        (
+          select jsonb_agg(distinct permission_key)
+          from (
+            select rp.permission_key
+            from role_permissions rp
+            where rp.role_id = u.role_id
+              and not exists (select 1 from user_permissions custom where custom.user_id = u.id)
+            union
+            select up.permission_key
+            from user_permissions up
+            where up.user_id = u.id and up.granted = true
+          ) permissions
+        ),
+        '[]'::jsonb
+      ) as permissions
+      from app_users u
+      where u.active = true and u.role_id in ('owner', 'staff')
+      order by u.role_id, u.name
+    `,
   ])
 
   return {
@@ -115,7 +137,283 @@ export async function getDashboardRows() {
     campaigns: campaignRows,
     influencers: influencerRows,
     tierTargets: tierRows,
+    users: userRows,
   }
+}
+
+export const permissionDefinitions = [
+  ['brand.read', 'View brands', 'View brand and campaign data'],
+  ['brand.write', 'Create and edit brands', 'Create or update brand records'],
+  ['brand.delete', 'Delete brands', 'Delete brands and related campaign data'],
+  ['campaign.write', 'Manage campaigns', 'Create and update campaign setup'],
+  ['influencer.create', 'Add influencers', 'Add influencer candidates'],
+  ['influencer.review', 'Review influencers', 'Approve, reject, or confirm influencer candidates'],
+  ['influencer.brand_select', 'Brand selection', 'Select influencers as a brand user'],
+  ['influencer.track', 'Track production', 'Update draft, post, asset, and payment tracking fields'],
+  ['employee.manage', 'Manage employees', 'Create, edit, disable, and delete employees'],
+  ['permission.manage', 'Manage permissions', 'Assign permissions to employees'],
+]
+
+const defaultRolePermissions = {
+  owner: permissionDefinitions.map(([key]) => key).filter((key) => key !== 'influencer.brand_select'),
+  brand: ['brand.read', 'influencer.brand_select'],
+  staff: ['brand.read', 'influencer.create', 'influencer.track'],
+}
+
+let authSchemaReady = false
+
+export async function ensureAuthSchema() {
+  const sql = await getSql()
+  if (!sql || authSchemaReady) return
+
+  await sql.begin(async (tx) => {
+    await tx`
+      create table if not exists permissions (
+        key text primary key,
+        label text not null,
+        description text,
+        created_at timestamptz not null default now()
+      )
+    `
+    await tx`
+      create table if not exists role_permissions (
+        role_id text references roles(id) on delete cascade,
+        permission_key text references permissions(key) on delete cascade,
+        primary key (role_id, permission_key)
+      )
+    `
+    await tx`
+      create table if not exists app_users (
+        id text primary key,
+        name text not null,
+        email text unique,
+        role_id text references roles(id),
+        title text,
+        active boolean not null default true,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `
+    await tx`
+      create table if not exists user_permissions (
+        user_id text references app_users(id) on delete cascade,
+        permission_key text references permissions(key) on delete cascade,
+        granted boolean not null default true,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        primary key (user_id, permission_key)
+      )
+    `
+
+    await tx`insert into roles (id, name) values ('brand', 'Brand'), ('owner', 'Owner'), ('staff', 'Staff') on conflict (id) do update set name = excluded.name`
+
+    for (const [key, label, description] of permissionDefinitions) {
+      await tx`
+        insert into permissions (key, label, description)
+        values (${key}, ${label}, ${description})
+        on conflict (key) do update set label = excluded.label, description = excluded.description
+      `
+    }
+
+    for (const [roleId, permissionKeys] of Object.entries(defaultRolePermissions)) {
+      for (const permissionKey of permissionKeys) {
+        await tx`
+          insert into role_permissions (role_id, permission_key)
+          values (${roleId}, ${permissionKey})
+          on conflict do nothing
+        `
+      }
+    }
+
+    const defaults = [
+      ['owner', 'หัวหน้า', 'owner@agencyhub.local', 'owner', 'Owner'],
+      ['brand', 'Brand', 'brand@agencyhub.local', 'brand', 'Brand user'],
+      ['staff', 'Staff', 'staff@agencyhub.local', 'staff', 'Staff'],
+    ]
+
+    for (const [id, name, email, roleId, title] of defaults) {
+      await tx`
+        insert into app_users (id, name, email, role_id, title, active)
+        values (${id}, ${name}, ${email}, ${roleId}, ${title}, true)
+        on conflict (id) do update set
+          name = excluded.name,
+          email = excluded.email,
+          role_id = excluded.role_id,
+          title = excluded.title,
+          active = excluded.active,
+          updated_at = now()
+      `
+    }
+  })
+
+  authSchemaReady = true
+}
+
+function normalizeUser(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role_id,
+    roleId: row.role_id,
+    title: row.title,
+    active: row.active,
+    permissions: row.permissions || [],
+  }
+}
+
+export async function getUserSession(userIdOrRole = 'brand') {
+  const sql = await getSql()
+  if (!sql) return null
+  await ensureAuthSchema()
+
+  const value = String(userIdOrRole || 'brand').toLowerCase()
+  const rows = await sql`
+    select u.*, coalesce(
+      (
+        select jsonb_agg(distinct permission_key)
+        from (
+          select rp.permission_key
+          from role_permissions rp
+          where rp.role_id = u.role_id
+            and not exists (select 1 from user_permissions custom where custom.user_id = u.id)
+          union
+          select up.permission_key
+          from user_permissions up
+          where up.user_id = u.id and up.granted = true
+        ) permissions
+      ),
+      '[]'::jsonb
+    ) as permissions
+    from app_users u
+    where u.active = true and (lower(u.id) = ${value} or lower(u.role_id) = ${value} or lower(coalesce(u.email, '')) = ${value})
+    order by case when lower(u.id) = ${value} then 0 else 1 end
+    limit 1
+  `
+
+  return normalizeUser(rows[0])
+}
+
+export async function listPermissions() {
+  const sql = await getSql()
+  if (!sql) return []
+  await ensureAuthSchema()
+  return sql`select * from permissions order by key`
+}
+
+export async function listUsers() {
+  const sql = await getSql()
+  if (!sql) return []
+  await ensureAuthSchema()
+  const rows = await sql`
+    select u.*, coalesce(
+      (
+        select jsonb_agg(distinct permission_key)
+        from (
+          select rp.permission_key
+          from role_permissions rp
+          where rp.role_id = u.role_id
+            and not exists (select 1 from user_permissions custom where custom.user_id = u.id)
+          union
+          select up.permission_key
+          from user_permissions up
+          where up.user_id = u.id and up.granted = true
+        ) permissions
+      ),
+      '[]'::jsonb
+    ) as permissions
+    from app_users u
+    order by u.role_id, u.name
+  `
+  return rows.map(normalizeUser)
+}
+
+export async function createUser(values) {
+  const sql = await getSql()
+  if (!sql) return null
+  await ensureAuthSchema()
+
+  const name = String(values.name || '').trim()
+  if (!name) throw new Error('Employee name is required.')
+
+  const roleId = String(values.roleId || values.role || 'staff').toLowerCase()
+  const id = await createUniqueId(sql, 'app_users', values.id || values.email || name, 'user')
+  const permissionKeys = Array.isArray(values.permissions) ? values.permissions : defaultRolePermissions[roleId] || []
+
+  return sql.begin(async (tx) => {
+    const rows = await tx`
+      insert into app_users (id, name, email, role_id, title, active)
+      values (${id}, ${name}, ${values.email || null}, ${roleId}, ${values.title || null}, ${values.active !== false})
+      returning *
+    `
+
+    for (const permissionKey of permissionKeys) {
+      await tx`
+        insert into user_permissions (user_id, permission_key, granted)
+        values (${id}, ${permissionKey}, true)
+        on conflict (user_id, permission_key) do update set granted = true, updated_at = now()
+      `
+    }
+
+    return rows[0]
+  })
+}
+
+export async function updateUser(id, values) {
+  const sql = await getSql()
+  if (!sql) return null
+  await ensureAuthSchema()
+
+  const allowedFields = {
+    name: 'name',
+    email: 'email',
+    role: 'role_id',
+    roleId: 'role_id',
+    title: 'title',
+    active: 'active',
+  }
+  const updates = Object.entries(values)
+    .filter(([key]) => Object.hasOwn(allowedFields, key))
+    .map(([key, value]) => ({ column: allowedFields[key], value }))
+
+  return sql.begin(async (tx) => {
+    let row = null
+    if (updates.length) {
+      const updateObject = Object.fromEntries(updates.map(({ column, value }) => [column, value]))
+      const rows = await tx`
+        update app_users
+        set ${tx(updateObject)}, updated_at = now()
+        where id = ${id}
+        returning *
+      `
+      row = rows[0] || null
+    } else {
+      const rows = await tx`select * from app_users where id = ${id} limit 1`
+      row = rows[0] || null
+    }
+
+    if (Array.isArray(values.permissions)) {
+      await tx`delete from user_permissions where user_id = ${id}`
+      for (const permissionKey of values.permissions) {
+        await tx`
+          insert into user_permissions (user_id, permission_key, granted)
+          values (${id}, ${permissionKey}, true)
+          on conflict (user_id, permission_key) do update set granted = true, updated_at = now()
+        `
+      }
+    }
+
+    return row
+  })
+}
+
+export async function deleteUser(id) {
+  const sql = await getSql()
+  if (!sql) return null
+  await ensureAuthSchema()
+  const rows = await sql`delete from app_users where id = ${id} and role_id <> 'owner' returning *`
+  return rows[0] || null
 }
 
 export async function updateInfluencer(id, values) {
@@ -123,6 +421,12 @@ export async function updateInfluencer(id, values) {
   if (!sql) return null
 
   const allowedFields = {
+    name: 'name',
+    channel: 'channel',
+    channels: 'channels',
+    tier: 'tier',
+    followers: 'followers',
+    dealDate: 'deal_date',
     status: 'status',
     draft: 'draft',
     draftStatus: 'draft_status',
@@ -143,15 +447,39 @@ export async function updateInfluencer(id, values) {
     return rows[0] || null
   }
 
-  const updateObject = Object.fromEntries(updates.map(({ column, value }) => [column, value]))
-  const rows = await sql`
-    update influencers
-    set ${sql(updateObject)}, updated_at = now()
-    where id = ${id}
-    returning *
-  `
+  return sql.begin(async (tx) => {
+    let row = null
+    const scalarUpdates = updates.filter(({ column }) => !['channels', 'bank', 'senior_approval'].includes(column))
 
-  return rows[0] || null
+    if (scalarUpdates.length) {
+      const updateObject = Object.fromEntries(scalarUpdates.map(({ column, value }) => [column, value]))
+      const rows = await tx`
+        update influencers
+        set ${tx(updateObject)}, updated_at = now()
+        where id = ${id}
+        returning *
+      `
+      row = rows[0] || null
+    }
+
+    for (const { column, value } of updates.filter(({ column }) => ['channels', 'bank', 'senior_approval'].includes(column))) {
+      const jsonValue = value == null ? null : tx.json(value)
+      if (column === 'channels') {
+        const rows = await tx`update influencers set channels = ${jsonValue}, updated_at = now() where id = ${id} returning *`
+        row = rows[0] || row
+      }
+      if (column === 'bank') {
+        const rows = await tx`update influencers set bank = ${jsonValue}, updated_at = now() where id = ${id} returning *`
+        row = rows[0] || row
+      }
+      if (column === 'senior_approval') {
+        const rows = await tx`update influencers set senior_approval = ${jsonValue}, updated_at = now() where id = ${id} returning *`
+        row = rows[0] || row
+      }
+    }
+
+    return row
+  })
 }
 
 function slugify(value) {
@@ -208,6 +536,38 @@ export async function createBrand(values) {
   `
 
   return rows[0]
+}
+
+export async function updateBrand(id, values) {
+  const sql = await getSql()
+  if (!sql) return null
+
+  const allowedFields = {
+    name: 'name',
+    category: 'category',
+    contact: 'contact',
+    health: 'health',
+    initials: 'initials',
+    activeCampaigns: 'active_campaigns',
+  }
+  const updates = Object.entries(values)
+    .filter(([key]) => Object.hasOwn(allowedFields, key))
+    .map(([key, value]) => ({ column: allowedFields[key], value }))
+
+  if (!updates.length) {
+    const rows = await sql`select * from brands where id = ${id} limit 1`
+    return rows[0] || null
+  }
+
+  const updateObject = Object.fromEntries(updates.map(({ column, value }) => [column, value]))
+  const rows = await sql`
+    update brands
+    set ${sql(updateObject)}, updated_at = now()
+    where id = ${id}
+    returning *
+  `
+
+  return rows[0] || null
 }
 
 export async function deleteBrand(id) {

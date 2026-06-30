@@ -11,7 +11,26 @@ import {
   tasks,
   tierTargets,
 } from '../../frontend/src/mock/agencyData.js'
-import { createBrand, createCampaign, createInfluencer, deleteBrand, getDashboardRows, getDatabaseStatus, getRowById, hasDatabaseUrl, listRows, updateCampaign, updateInfluencer } from './db.js'
+import {
+  createBrand,
+  createCampaign,
+  createInfluencer,
+  createUser,
+  deleteBrand,
+  deleteUser,
+  getDashboardRows,
+  getDatabaseStatus,
+  getRowById,
+  getUserSession,
+  hasDatabaseUrl,
+  listPermissions,
+  listRows,
+  listUsers,
+  updateBrand,
+  updateCampaign,
+  updateInfluencer,
+  updateUser,
+} from './db.js'
 
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -53,7 +72,15 @@ const apiEndpoints = [
   'GET /api/brief-versions',
   'GET /api/draft-statuses',
   'GET /api/current-staff',
+  'GET /api/session',
+  'POST /api/session',
+  'GET /api/users',
+  'POST /api/users',
+  'PATCH /api/users/:id',
+  'DELETE /api/users/:id',
+  'GET /api/permissions',
   'POST /api/brands',
+  'PATCH /api/brands/:id',
   'DELETE /api/brands/:id',
   'POST /api/campaigns',
   'PATCH /api/campaigns/:id',
@@ -105,6 +132,51 @@ function camelizeRow(row) {
       value,
     ]),
   )
+}
+
+function normalizeRole(role = '') {
+  const map = { Brand: 'brand', Owner: 'owner', Staff: 'staff' }
+  return map[role] || String(role || '').toLowerCase() || 'brand'
+}
+
+function hasPermission(session, permissionKey) {
+  return session?.permissions?.includes(permissionKey)
+}
+
+async function getRequestSession(req, body) {
+  if (!hasDatabaseUrl()) {
+    const role = normalizeRole(req.headers['x-agencyhub-role'] || body?.role || 'brand')
+    return {
+      id: role,
+      name: role,
+      role,
+      permissions: role === 'owner'
+        ? ['brand.read', 'brand.write', 'brand.delete', 'campaign.write', 'influencer.create', 'influencer.review', 'influencer.track', 'employee.manage', 'permission.manage']
+        : role === 'staff'
+          ? ['brand.read', 'influencer.create', 'influencer.track']
+          : ['brand.read', 'influencer.brand_select'],
+    }
+  }
+
+  const userId = req.headers['x-agencyhub-user-id'] || body?.userId || body?.username || req.headers['x-agencyhub-role'] || body?.role
+  return getUserSession(userId)
+}
+
+function sendForbidden(res, permissionKey) {
+  return sendJson(res, 403, {
+    error: 'forbidden',
+    message: `Missing permission "${permissionKey}".`,
+    permission: permissionKey,
+  })
+}
+
+async function requirePermission(req, res, permissionKey, body) {
+  const session = await getRequestSession(req, body)
+  if (!hasPermission(session, permissionKey)) {
+    sendForbidden(res, permissionKey)
+    return null
+  }
+  return session
 }
 
 function inferChannelType(url = '') {
@@ -234,7 +306,14 @@ function buildDashboardData(rows) {
 
   return {
     brands: [...brandMap.values()],
-    seniors,
+    seniors: (rows.users?.length ? rows.users : seniors).map((user) => ({
+      id: user.id,
+      name: user.name,
+      role: user.title || user.role_id || user.role || 'Staff',
+      email: user.email,
+      active: user.active,
+      permissions: user.permissions || [],
+    })),
   }
 }
 
@@ -252,6 +331,67 @@ export async function handleApiRequest(req, res) {
     const resource = pathParts[1]
     const id = pathParts[2]
 
+    if (resource === 'session') {
+      if (req.method === 'GET' || req.method === 'POST') {
+        const body = req.method === 'POST' ? await readJsonBody(req) : {}
+        const session = await getRequestSession(req, body)
+
+        if (!session) {
+          return sendJson(res, 401, {
+            error: 'unauthorized',
+            message: 'User was not found or is inactive.',
+          })
+        }
+
+        return sendJson(res, 200, { user: session, permissions: session.permissions })
+      }
+    }
+
+    if (resource === 'permissions') {
+      if (req.method !== 'GET') {
+        return sendJson(res, 405, { error: 'method_not_allowed', message: 'Only GET is supported for permissions.' })
+      }
+      if (!hasDatabaseUrl()) return sendJson(res, 200, [])
+      return sendJson(res, 200, await listPermissions())
+    }
+
+    if (resource === 'users') {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to manage employees.',
+        })
+      }
+
+      if (req.method === 'GET') {
+        const session = await requirePermission(req, res, 'employee.manage')
+        if (!session) return
+        return sendJson(res, 200, await listUsers())
+      }
+
+      const body = await readJsonBody(req)
+      const requiredPermission = body.permissions ? 'permission.manage' : 'employee.manage'
+      const session = await requirePermission(req, res, requiredPermission, body)
+      if (!session) return
+
+      if (req.method === 'POST') {
+        const created = await createUser(body)
+        return sendJson(res, 201, created)
+      }
+
+      if (req.method === 'PATCH' && id) {
+        const updated = await updateUser(id, body)
+        if (!updated) return sendJson(res, 404, { error: 'not_found', message: `No users item found for id "${id}".` })
+        return sendJson(res, 200, updated)
+      }
+
+      if (req.method === 'DELETE' && id) {
+        const deleted = await deleteUser(id)
+        if (!deleted) return sendJson(res, 404, { error: 'not_found', message: `No users item found for id "${id}" or user cannot be deleted.` })
+        return sendJson(res, 200, deleted)
+      }
+    }
+
     if (req.method === 'POST' && resource === 'brands') {
       if (!hasDatabaseUrl()) {
         return sendJson(res, 409, {
@@ -261,8 +401,33 @@ export async function handleApiRequest(req, res) {
       }
 
       const body = await readJsonBody(req)
+      const session = await requirePermission(req, res, 'brand.write', body)
+      if (!session) return
       const created = await createBrand(body)
       return sendJson(res, 201, camelizeRow(created))
+    }
+
+    if (req.method === 'PATCH' && resource === 'brands' && id) {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to persist brand updates.',
+        })
+      }
+
+      const body = await readJsonBody(req)
+      const session = await requirePermission(req, res, 'brand.write', body)
+      if (!session) return
+      const updated = await updateBrand(id, body)
+
+      if (!updated) {
+        return sendJson(res, 404, {
+          error: 'not_found',
+          message: `No brands item found for id "${id}".`,
+        })
+      }
+
+      return sendJson(res, 200, camelizeRow(updated))
     }
 
     if (req.method === 'DELETE' && resource === 'brands' && id) {
@@ -273,6 +438,8 @@ export async function handleApiRequest(req, res) {
         })
       }
 
+      const session = await requirePermission(req, res, 'brand.delete')
+      if (!session) return
       const deleted = await deleteBrand(id)
 
       if (!deleted) {
@@ -294,6 +461,8 @@ export async function handleApiRequest(req, res) {
       }
 
       const body = await readJsonBody(req)
+      const session = await requirePermission(req, res, 'campaign.write', body)
+      if (!session) return
       const created = await createCampaign(body)
       return sendJson(res, 201, camelizeRow(created))
     }
@@ -307,6 +476,8 @@ export async function handleApiRequest(req, res) {
       }
 
       const body = await readJsonBody(req)
+      const session = await requirePermission(req, res, 'campaign.write', body)
+      if (!session) return
       const updated = await updateCampaign(id, body)
 
       if (!updated) {
@@ -328,6 +499,10 @@ export async function handleApiRequest(req, res) {
       }
 
       const body = await readJsonBody(req)
+      const session = await requirePermission(req, res, 'influencer.create', body)
+      if (!session) return
+      body.addedBy = body.addedBy || session.name
+      body.addedByRole = body.addedByRole || session.role
       const created = await createInfluencer(body)
       return sendJson(res, 201, camelizeRow(created))
     }
@@ -341,6 +516,18 @@ export async function handleApiRequest(req, res) {
       }
 
       const body = await readJsonBody(req)
+      const statusPermissionMap = {
+        pending_owner: 'influencer.create',
+        owner_approved: 'influencer.review',
+        owner_rejected: 'influencer.review',
+        confirmed: 'influencer.review',
+        brand_selected: 'influencer.brand_select',
+      }
+      const isTrackingUpdate = Object.hasOwn(body, 'draft') || Object.hasOwn(body, 'postDate') || Object.hasOwn(body, 'postLink') || Object.hasOwn(body, 'assetLink')
+      const isProfileUpdate = Object.hasOwn(body, 'name') || Object.hasOwn(body, 'channel') || Object.hasOwn(body, 'channels') || Object.hasOwn(body, 'tier') || Object.hasOwn(body, 'followers') || Object.hasOwn(body, 'dealDate') || Object.hasOwn(body, 'bank')
+      const permissionKey = statusPermissionMap[body.status] || (isProfileUpdate ? 'influencer.create' : isTrackingUpdate ? 'influencer.track' : 'influencer.review')
+      const session = await requirePermission(req, res, permissionKey, body)
+      if (!session) return
       const updated = await updateInfluencer(id, body)
 
       if (!updated) {
