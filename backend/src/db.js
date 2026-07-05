@@ -436,6 +436,7 @@ export async function updateInfluencer(id, values) {
     assetLink: 'asset_link',
     bank: 'bank',
     seniorApproval: 'senior_approval',
+    extraInfo: 'extra_info',
   }
 
   const updates = Object.entries(values)
@@ -449,7 +450,7 @@ export async function updateInfluencer(id, values) {
 
   return sql.begin(async (tx) => {
     let row = null
-    const scalarUpdates = updates.filter(({ column }) => !['channels', 'bank', 'senior_approval'].includes(column))
+    const scalarUpdates = updates.filter(({ column }) => !['channels', 'bank', 'senior_approval', 'extra_info'].includes(column))
 
     if (scalarUpdates.length) {
       const updateObject = Object.fromEntries(scalarUpdates.map(({ column, value }) => [column, value]))
@@ -462,7 +463,7 @@ export async function updateInfluencer(id, values) {
       row = rows[0] || null
     }
 
-    for (const { column, value } of updates.filter(({ column }) => ['channels', 'bank', 'senior_approval'].includes(column))) {
+    for (const { column, value } of updates.filter(({ column }) => ['channels', 'bank', 'senior_approval', 'extra_info'].includes(column))) {
       const jsonValue = value == null ? null : tx.json(value)
       if (column === 'channels') {
         const rows = await tx`update influencers set channels = ${jsonValue}, updated_at = now() where id = ${id} returning *`
@@ -474,6 +475,10 @@ export async function updateInfluencer(id, values) {
       }
       if (column === 'senior_approval') {
         const rows = await tx`update influencers set senior_approval = ${jsonValue}, updated_at = now() where id = ${id} returning *`
+        row = rows[0] || row
+      }
+      if (column === 'extra_info') {
+        const rows = await tx`update influencers set extra_info = ${jsonValue}, updated_at = now() where id = ${id} returning *`
         row = rows[0] || row
       }
     }
@@ -588,6 +593,35 @@ export async function deleteBrand(id) {
   })
 }
 
+export async function deleteCampaign(id) {
+  const sql = await getSql()
+  if (!sql) return null
+
+  return sql.begin(async (tx) => {
+    const campaignRows = await tx`select * from campaigns where id = ${id} limit 1`
+    const campaign = campaignRows[0]
+    if (!campaign) return null
+
+    await tx`delete from influencers where campaign_id = ${id}`
+    await tx`delete from tier_targets where campaign_id = ${id}`
+    await tx`delete from brief_versions where campaign_id = ${id}`
+
+    const rows = await tx`delete from campaigns where id = ${id} returning *`
+
+    if (campaign.brand_id) {
+      await tx`
+        update brands
+        set active_campaigns = (
+          select count(*)::int from campaigns where brand_id = ${campaign.brand_id}
+        ), updated_at = now()
+        where id = ${campaign.brand_id}
+      `
+    }
+
+    return rows[0] || null
+  })
+}
+
 export async function createCampaign(values) {
   const sql = await getSql()
   if (!sql) return null
@@ -632,7 +666,8 @@ export async function createCampaign(values) {
         target,
         brief_file,
         brief_version,
-        brief_date
+        brief_date,
+        campaign_settings
       ) values (
         ${id},
         ${brandId},
@@ -657,7 +692,8 @@ export async function createCampaign(values) {
         ${target},
         ${values.briefFile || null},
         ${values.briefVersion || (values.briefFile ? 'v1' : null)},
-        ${values.briefDate || null}
+        ${values.briefDate || null},
+        ${values.campaignSettings ? tx.json(values.campaignSettings) : null}
       )
       returning *
     `
@@ -719,6 +755,7 @@ export async function updateCampaign(id, values) {
     briefFile: 'brief_file',
     briefVersion: 'brief_version',
     briefDate: 'brief_date',
+    campaignSettings: 'campaign_settings',
   }
 
   const updates = Object.entries(values)
@@ -730,15 +767,30 @@ export async function updateCampaign(id, values) {
     return rows[0] || null
   }
 
-  const updateObject = Object.fromEntries(updates.map(({ column, value }) => [column, value]))
-  const rows = await sql`
-    update campaigns
-    set ${sql(updateObject)}, updated_at = now()
-    where id = ${id}
-    returning *
-  `
+  return sql.begin(async (tx) => {
+    const scalarUpdates = updates.filter(({ column }) => column !== 'campaign_settings')
+    let row = null
 
-  return rows[0] || null
+    if (scalarUpdates.length) {
+      const updateObject = Object.fromEntries(scalarUpdates.map(({ column, value }) => [column, value]))
+      const rows = await tx`
+        update campaigns
+        set ${tx(updateObject)}, updated_at = now()
+        where id = ${id}
+        returning *
+      `
+      row = rows[0] || null
+    }
+
+    const settingsUpdate = updates.find(({ column }) => column === 'campaign_settings')
+    if (settingsUpdate) {
+      const jsonValue = settingsUpdate.value == null ? null : tx.json(settingsUpdate.value)
+      const rows = await tx`update campaigns set campaign_settings = ${jsonValue}, updated_at = now() where id = ${id} returning *`
+      row = rows[0] || row
+    }
+
+    return row
+  })
 }
 
 export async function createInfluencer(values) {
@@ -778,7 +830,8 @@ export async function createInfluencer(values) {
       draft_status,
       draft,
       product_sent,
-      bank
+      bank,
+      extra_info
     ) values (
       ${id},
       ${campaignId},
@@ -794,7 +847,8 @@ export async function createInfluencer(values) {
       ${values.draftStatus || 'Waiting draft'},
       ${values.draft || 'waiting'},
       ${Boolean(values.productSent)},
-      ${bank ? sql.json(bank) : null}
+      ${bank ? sql.json(bank) : null},
+      ${values.extraInfo ? sql.json(values.extraInfo) : null}
     )
     returning *
   `

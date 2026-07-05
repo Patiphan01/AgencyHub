@@ -6,7 +6,7 @@
     "backend:dev": "node backend/server.js",
     "frontend:dev": "cd frontend && npm run dev",
     "build": "cd frontend && npm install && npm run build",
-    "db:migrate": "node backend/db/run-sql-file.js backend/db/migrations/001_initial_schema.sql && node backend/db/run-sql-file.js backend/db/migrations/002_users_permissions.sql",
+    "db:migrate": "node backend/db/run-sql-file.js backend/db/migrations/001_initial_schema.sql && node backend/db/run-sql-file.js backend/db/migrations/002_users_permissions.sql && node backend/db/run-sql-file.js backend/db/migrations/003_influencer_extra_info.sql && node backend/db/run-sql-file.js backend/db/migrations/004_campaign_settings.sql",
     "db:migrate:permissions": "node backend/db/run-sql-file.js backend/db/migrations/002_users_permissions.sql",
     "db:seed": "node backend/db/run-sql-file.js backend/db/seeds/001_seed_from_current_mock.sql",
     "db:clear-demo": "node backend/db/run-sql-file.js backend/db/seeds/002_clear_demo_data.sql"

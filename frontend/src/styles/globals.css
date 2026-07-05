@@ -1518,7 +1518,8 @@ button {
 }
 
 .agency-mockup input,
-.agency-mockup select {
+.agency-mockup select,
+.agency-mockup textarea {
   border: 1px solid var(--border);
   border-radius: 9px;
   background: #ffffff;
@@ -1526,6 +1527,21 @@ button {
   padding: 8px 10px;
   font: inherit;
   font-size: 13px;
+}
+
+.agency-mockup textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.agency-mockup .extra-info-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.agency-mockup .extra-info-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 
 .agency-mockup .compact-input {

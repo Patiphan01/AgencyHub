@@ -43,6 +43,7 @@ create table if not exists campaigns (
   brief_version text,
   brief_date text,
   tier_stats jsonb,
+  campaign_settings jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -67,6 +68,7 @@ create table if not exists influencers (
   asset_link text,
   bank jsonb,
   senior_approval jsonb,
+  extra_info jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

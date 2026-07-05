@@ -6,6 +6,7 @@ import {
   createInfluencer,
   createUser,
   deleteBrand,
+  deleteCampaign,
   deleteUser,
   getDashboardData,
   getPermissions,
@@ -27,7 +28,73 @@ const TIER_COLOR = {
 const CHANNELS = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'lemon8']
 const CH_LABEL = { instagram: 'IG', tiktok: 'TikTok', youtube: 'YT', facebook: 'FB', twitter: 'X', lemon8: 'Lemon8' }
 const CH_CLASS = { instagram: 'ig', tiktok: 'tt', youtube: 'yt', facebook: 'fb', twitter: 'tw', lemon8: 'lemon8' }
+const KOL_LEVELS = ['Creator Sales of 5K', 'Nano (1K+ Followers)', 'Micro (10K+ Followers)']
+const CONTENT_FORMATS = ['รีวิว 1 คลิป 1 ช่องทางคือTikTok', 'รีวิว 1 คลิป 2ช่องทางขึ้นไป']
+const CHANNEL_COUNTS = ['1 ช่องทาง', '2 ช่องทาง', '4 ช่องทาง']
+const CLIP_COUNTS = ['1 คลิป']
+const CATEGORIES = ['Beauty', 'Health', 'ไลฟ์สไตล์']
+const PERIOD_OPTIONS = ['None', '7 days', '30 Days', '60 Days', '90 Days', '120 Days', '150 Days', '180 Days', '1 Year', 'Always', 'NO']
+const CF_OPTIONS = ['', 'CF', 'NO']
+const DELIVERY_OPTIONS = ['', 'ส่งสินค้าแล้ว', 'สินค้าถึงแล้ว']
 const THAI_BANKS = ['ธ.กสิกรไทย', 'ธ.กรุงเทพ', 'ธ.ไทยพาณิชย์', 'ธ.กรุงไทย', 'ธ.ทหารไทยธนชาต', 'Promptpay']
+const DEPRECATED_EXTRA_INFO_KEYS = ['sequenceNo', 'ownerName', 'recordDate', 'currentStatus', 'postedDate', 'linkPost', 'asset', 'seniorKolCf', 'brandCf']
+const EXTRA_INFO_SECTIONS = [
+  {
+    title: 'Profile & Deal',
+    fields: [
+      { name: 'tiktokAccount', label: 'ชื่อ Acc.TikTok(@)' },
+      { name: 'contentFormat', label: 'รูปแบบคอนเทนต์', options: CONTENT_FORMATS },
+      { name: 'channelCount', label: 'จำนวนช่องทาง', options: CHANNEL_COUNTS },
+      { name: 'clipCount', label: 'จำนวนคลิป', options: CLIP_COUNTS },
+      { name: 'category', label: 'Category', options: CATEGORIES },
+      { name: 'price', label: 'Price', placeholder: 'FREE หรือ จำนวนเงิน' },
+    ],
+  },
+  {
+    title: 'Periods & Product',
+    fields: [
+      { name: 'periodClip', label: 'Peroid Clip', options: PERIOD_OPTIONS },
+      { name: 'periodCode', label: 'Period Code', options: PERIOD_OPTIONS },
+      { name: 'periodCart', label: 'Period Cart', options: PERIOD_OPTIONS },
+      { name: 'buyingAsset', label: 'Buying Asset', placeholder: 'FREE หรือ ฿ 300.00' },
+      { name: 'periodAsset', label: 'Period Asset', options: PERIOD_OPTIONS },
+      { name: 'products', label: 'Products', options: [''] },
+    ],
+  },
+  {
+    title: 'Shipping & Contact',
+    fields: [
+      { name: 'shippingName', label: 'Name' },
+      { name: 'address', label: 'Address', multiline: true },
+      { name: 'tel', label: 'Tel.' },
+      { name: 'trackingNo', label: 'Tracking NO.' },
+      { name: 'delivered', label: 'Delivered', options: DELIVERY_OPTIONS },
+      { name: 'kolDeliveredDate', label: 'วันที่สินค้าถึงKOL', type: 'date' },
+    ],
+  },
+  {
+    title: 'Draft, Feedback & Posting',
+    fields: [
+      { name: 'draftDate', label: 'วันที่ ส่งดราฟ', type: 'date' },
+      { name: 'draftLink', label: 'Draft', type: 'url' },
+      { name: 'kolSpecialistFeedback', label: 'Feedback by KOL Specialist', multiline: true },
+      { name: 'confirmDraftByTangkwa', label: 'Comfirm Draft by Tangkwa' },
+      { name: 'brandFeedback', label: 'Brand Feedback', options: CF_OPTIONS },
+      { name: 'gencode', label: 'Gencode', placeholder: '#campaign-code' },
+    ],
+  },
+  {
+    title: 'Approval, Payment & Notes',
+    fields: [
+      { name: 'commentKol', label: 'Comment Kol', multiline: true },
+      { name: 'commentPtee', label: 'Comment PTee', multiline: true },
+      { name: 'pteeCf', label: 'PTee CF', options: ['', 'CF'] },
+      { name: 'idCardCopy', label: 'สำเนาบัตรประชาชน' },
+      { name: 'budget', label: 'Budget', type: 'number' },
+      { name: 'clearStatus', label: 'Clear', options: ['', 'นับยอด'] },
+    ],
+  },
+]
 
 const STATUS_MAP = {
   sourced: { label: 'ยังไม่ส่งหัวหน้า', cls: 'muted' },
@@ -78,6 +145,9 @@ const DB = {
           brandQuota: 300,
           briefFile: 'GlowSkin_HydraGlow_Brief_v2.pdf',
           briefVersion: 'v2',
+          campaignSettings: {
+            products: ['Hydra Glow Serum', 'GlowSkin Toner', 'GlowSkin Moisture Gel'],
+          },
           briefDate: '10 มิ.ย. 2569',
           tierStats: {
             Nano: makeStats({ target: 120, sourced: 135, oa: 125, bs: 115, posted: 58 }),
@@ -109,6 +179,9 @@ const DB = {
           brandQuota: 150,
           briefFile: 'GlowSkin_SPF50_Brief_v1.pdf',
           briefVersion: 'v1',
+          campaignSettings: {
+            products: ['SPF50 Sunscreen', 'After Sun Gel'],
+          },
           briefDate: '2 พ.ค. 2569',
           tierStats: {
             Nano: makeStats({ target: 60, sourced: 60, oa: 58, bs: 55, posted: 55 }),
@@ -143,6 +216,9 @@ const DB = {
           brandQuota: 80,
           briefFile: null,
           briefVersion: null,
+          campaignSettings: {
+            products: ['Chocolate Whey Protein', 'Matcha Whey Protein', 'Protein Shaker'],
+          },
           briefDate: null,
           tierStats: {
             Nano: makeStats({ target: 30, sourced: 0, oa: 0, bs: 0, posted: 0 }),
@@ -280,6 +356,45 @@ function buildUpdatedChannels(item, values) {
     else byType.delete(type)
   })
   return [...byType.entries()].map(([type, url]) => ({ type, url }))
+}
+
+function getExtraInfoFromForm(formData) {
+  return Object.fromEntries(
+    EXTRA_INFO_SECTIONS
+      .flatMap((section) => section.fields)
+      .map((field) => [field.name, String(formData.get(field.name) || '').trim()])
+      .filter(([, value]) => value !== ''),
+  )
+}
+
+function mergeExtraInfo(current, next) {
+  const merged = { ...(current || {}), ...next }
+  DEPRECATED_EXTRA_INFO_KEYS.forEach((key) => {
+    delete merged[key]
+  })
+  Object.keys(merged).forEach((key) => {
+    if (merged[key] === '') delete merged[key]
+  })
+  return Object.keys(merged).length ? merged : null
+}
+
+function parseOptionLines(value) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function getCampaignProductOptions(campaign) {
+  return ['', ...(campaign?.campaignSettings?.products || [])]
+}
+
+function todayDateValue() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function BackButton({ onClick, label = 'ย้อนกลับ' }) {
+  return <button className="btn secondary" onClick={onClick} type="button">← {label}</button>
 }
 
 function ChannelPills({ item }) {
@@ -543,6 +658,7 @@ function BrandDashboard({ go }) {
 function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds, state, go, refreshDashboardData }) {
   return (
     <>
+      <BackButton onClick={() => go({ view: 'dashboard', campaignId: null })} />
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">
         {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}
@@ -785,6 +901,7 @@ function OwnerBrand({ brand, go, openModal, refreshDashboardData }) {
     <>
       <div className="flex-between">
         <div>
+          <BackButton onClick={() => go({ view: 'dashboard', brandId: null, campaignId: null })} />
           <h1 className="page-title">{brand.name}</h1>
           <p className="page-sub">แคมเปญทั้งหมดของแบรนด์นี้</p>
         </div>
@@ -820,9 +937,29 @@ function OwnerBrand({ brand, go, openModal, refreshDashboardData }) {
 }
 
 function OwnerCampaign({ brand, campaign, state, go, openModal, refreshDashboardData }) {
+  const canWriteCampaign = useCan('campaign.write')
+
+  async function handleDeleteCampaign() {
+    if (!window.confirm(`ลบแคมเปญ "${campaign.name}" และรายชื่อ influencer ทั้งหมดในแคมเปญนี้?`)) return
+
+    try {
+      await deleteCampaign(campaign.id)
+      await refreshDashboardData()
+      go({ view: 'brand', brandId: brand.id, campaignId: null, tab: 'review' })
+    } catch (error) {
+      alert(`ยังลบแคมเปญไม่ได้: ${error.message}`)
+    }
+  }
+
   return (
     <>
-      <h1 className="page-title">{campaign.name}</h1>
+      <div className="flex-between">
+        <div>
+          <BackButton onClick={() => go({ view: 'brand', brandId: brand.id, campaignId: null })} />
+          <h1 className="page-title">{campaign.name}</h1>
+        </div>
+        {canWriteCampaign ? <button className="btn danger-btn" onClick={handleDeleteCampaign} type="button">ลบแคมเปญ</button> : null}
+      </div>
       <p className="page-sub">
         {brand.name} · {campaign.status} · เริ่มลงคลิป {campaign.startDate} · ครบกำหนด {campaign.deadlineDate}
         {campaign.briefFile ? <> · <a className="link" href={getBriefDownloadUrl(campaign.briefFile)} target="_blank" rel="noopener noreferrer">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : null}
@@ -956,6 +1093,7 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
   const canManageEmployees = useCan('employee.manage')
   const canManagePermissions = useCan('permission.manage')
   const [savingBrief, setSavingBrief] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
 
   async function handleBriefSubmit(event) {
     event.preventDefault()
@@ -990,6 +1128,31 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
     }
   }
 
+  async function handleCampaignSettingsSubmit(event) {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const products = parseOptionLines(formData.get('products'))
+
+    try {
+      if (!canWriteCampaign) {
+        alert('ไม่มีสิทธิ์แก้ไขแคมเปญ')
+        return
+      }
+      setSavingSettings(true)
+      await updateCampaign(campaign.id, {
+        campaignSettings: {
+          ...(campaign.campaignSettings || {}),
+          products,
+        },
+      })
+      await refreshDashboardData()
+    } catch (error) {
+      alert(`ยังบันทึกตัวเลือกของแคมเปญไม่ได้: ${error.message}`)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
   return (
     <>
       <div className="card block-gap">
@@ -1003,6 +1166,26 @@ function OwnerSetupTab({ campaign, openModal, refreshDashboardData }) {
             <Field label="Google Doc / URL บรีฟ" name="briefUrl" placeholder="https://docs.google.com/..." type="url" />
           </div>
           {canWriteCampaign ? <button className="btn secondary" disabled={savingBrief} type="submit">{savingBrief ? 'กำลังบันทึก...' : campaign.briefFile ? 'บันทึกบรีฟเวอร์ชันใหม่' : 'บันทึกบรีฟ'}</button> : null}
+        </form>
+      </div>
+      <div className="card block-gap">
+        <div className="section-title">ตัวเลือกให้ทีมใช้ <span className="hint">พนักงานจะเห็นเป็น dropdown ตอนกรอกข้อมูล KOL</span></div>
+        <form className="block-gap" onSubmit={handleCampaignSettingsSubmit}>
+          <div className="grid cols-2 block-gap">
+            <div className="field">
+              <label>Products</label>
+              <textarea
+                defaultValue={(campaign.campaignSettings?.products || []).join('\n')}
+                name="products"
+                placeholder="ใส่ชื่อสินค้า บรรทัดละ 1 รายการ"
+                rows="5"
+              />
+            </div>
+            <div className="note-banner no-margin">
+              แนะนำให้หัวหน้ากรอกสินค้าที่ใช้จริงของแคมเปญนี้ก่อนเริ่มหา KOL ถ้าเว้นว่างไว้ ช่อง Products ฝั่งพนักงานจะไม่มีตัวเลือกให้เลือก
+            </div>
+          </div>
+          {canWriteCampaign ? <button className="btn primary" disabled={savingSettings} type="submit">{savingSettings ? 'กำลังบันทึก...' : 'บันทึกตัวเลือก'}</button> : null}
         </form>
       </div>
       <div className="grid cols-2">
@@ -1102,6 +1285,7 @@ function StaffDashboard({ allCampaigns, go }) {
 function StaffBrand({ brand, go }) {
   return (
     <>
+      <BackButton onClick={() => go({ view: 'dashboard', brandId: null, campaignId: null })} />
       <h1 className="page-title">{brand.name}</h1>
       <p className="page-sub">บรีฟ/แคมเปญทั้งหมดของแบรนด์นี้</p>
       <div className="grid cols-2">
@@ -1123,6 +1307,7 @@ function StaffBrand({ brand, go }) {
 function StaffCampaign({ brand, campaign, state, go, refreshDashboardData }) {
   return (
     <>
+      <BackButton onClick={() => go({ view: 'brand', brandId: brand.id, campaignId: null })} />
       <h1 className="page-title">{campaign.name}</h1>
       <p className="page-sub">{brand.name} · {campaign.status} {campaign.briefFile ? <>· <a className="link" href={getBriefDownloadUrl(campaign.briefFile)} target="_blank" rel="noopener noreferrer">ดาวน์โหลดบรีฟ ({campaign.briefVersion})</a></> : '· ยังไม่มีไฟล์บรีฟ'}</p>
       <Tabs tabs={[['source', 'หาอินฟลูเอนเซอร์'], ['track', 'ติดตามงาน / อัปเดตคอนเทนต์']]} active={state.tab} onChange={(tab) => go({ tab })} />
@@ -1191,7 +1376,7 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
       return
     }
     const formData = new FormData(formElement)
-    const controls = Array.from(formElement.querySelectorAll('input, select'))
+    const controls = Array.from(formElement.querySelectorAll('input, select, textarea'))
     const getValue = (name, index) => formData.get(name) || controls[index]?.value || ''
 
     try {
@@ -1226,6 +1411,7 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
         status: 'sourced',
         draft: 'waiting',
         draftStatus: 'Waiting draft',
+        extraInfo: getExtraInfoFromForm(formData),
       })
       controls.forEach((control) => {
         if (control.tagName === 'SELECT') control.selectedIndex = 0
@@ -1261,12 +1447,13 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
         <div className="section-title">เพิ่มอินฟลูเอนเซอร์ใหม่</div>
         <div className="dup-banner">ระบบจะแจ้งเตือนหากช่องทางนี้มีคนในทีมเพิ่มไว้แล้ว เพื่อป้องกันการคัดซ้ำ</div>
         <div className="grid cols-4 block-gap">
-          <Field label="ชื่ออินฟลูเอนเซอร์" placeholder="เช่น Beauty by Ploy" />
-          <Field label="ระดับ" options={TIERS} />
-          <Field label="ผู้ติดตาม (ผลรวมทุกช่อง)" placeholder="เช่น 45K" />
-          <Field label="วันที่ดีลงานสำเร็จ" type="date" />
+          <Field label="ชื่ออินฟลูเอนเซอร์" name="name" placeholder="เช่น Beauty by Ploy" />
+          <Field label="Level" name="tier" options={KOL_LEVELS} />
+          <Field label="ผู้ติดตาม (ผลรวมทุกช่อง)" name="followers" placeholder="เช่น 45K" />
+          <Field label="วันที่ดีลงานสำเร็จ" name="dealDate" type="date" value={todayDateValue()} />
         </div>
         <ChannelFields />
+        <ExtraInfoFields campaign={campaign} compact />
         <BankFields />
         <button className="btn primary form-action" disabled={saving} type="submit">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อเข้าฐานข้อมูล'}</button>
       </form> : null}
@@ -1292,6 +1479,7 @@ function StaffSourceTab({ campaign, refreshDashboardData }) {
       {editingInfluencer ? (
         <StaffInfluencerEditModal
           influencer={editingInfluencer}
+          campaign={campaign}
           onClose={() => setEditingInfluencer(null)}
           onSaved={async () => {
             setEditingInfluencer(null)
@@ -1341,7 +1529,7 @@ function ChannelFields() {
     <>
       <div className="section-title mini-title">ช่องทางลงคลิป <span className="hint">ใส่อย่างน้อย 1 ช่องทาง</span></div>
       <div className="grid cols-3 block-gap">
-        {CHANNELS.map((channel) => <Field key={channel} label={CH_LABEL[channel] || channel} placeholder={`วางลิงก์ ${CH_LABEL[channel] || channel}`} />)}
+        {CHANNELS.map((channel) => <Field key={channel} label={CH_LABEL[channel] || channel} name={channel} placeholder={`วางลิงก์ ${CH_LABEL[channel] || channel}`} />)}
       </div>
     </>
   )
@@ -1352,15 +1540,51 @@ function BankFields() {
     <>
       <div className="section-title mini-title">ข้อมูลธนาคารสำหรับจ่ายเงิน <span className="hint">ใส่ตอนดีลเสร็จได้เลย</span></div>
       <div className="grid cols-3 block-gap">
-        <Field label="ธนาคาร" options={['-- เลือกธนาคาร --', ...THAI_BANKS]} />
-        <Field label="เลขบัญชี / Promptpay" placeholder="0123456789" />
-        <Field label="ชื่อเจ้าของบัญชี" placeholder="ตามหน้าบัตรประชาชน" />
+        <Field label="ธนาคาร" name="bankName" options={['-- เลือกธนาคาร --', ...THAI_BANKS]} />
+        <Field label="เลขบัญชี / Promptpay" name="bankAccount" placeholder="0123456789" />
+        <Field label="ชื่อเจ้าของบัญชี" name="bankOwner" placeholder="ตามหน้าบัตรประชาชน" />
       </div>
     </>
   )
 }
 
-function StaffInfluencerEditModal({ influencer, onClose, onSaved }) {
+function ExtraInfoFields({ values = {}, compact = false, campaign }) {
+  const sections = compact ? EXTRA_INFO_SECTIONS.slice(0, 3) : EXTRA_INFO_SECTIONS
+  const hasCampaignProducts = Boolean(campaign?.campaignSettings?.products?.length)
+  return (
+    <div className="extra-info-panel">
+      {sections.map((section) => (
+        <div className="extra-info-section" key={section.title}>
+          <div className="section-title mini-title">{section.title}</div>
+          {section.fields.some((field) => field.name === 'products') && !hasCampaignProducts ? (
+            <div className="note-banner no-margin">แคมเปญนี้ยังไม่ได้ตั้ง Products จากฝั่งหัวหน้า ช่อง Products จะยังไม่มีตัวเลือกให้เลือก</div>
+          ) : null}
+          <div className="grid cols-3 block-gap">
+            {section.fields.map((field) => (
+              (() => {
+                const options = field.name === 'products' ? getCampaignProductOptions(campaign) : field.options
+                return (
+                  <Field
+                    key={field.name}
+                    label={field.label}
+                    multiline={field.multiline}
+                    name={field.name}
+                    options={options}
+                    placeholder={field.placeholder}
+                    type={field.type || 'text'}
+                    value={values[field.name] || ''}
+                  />
+                )
+              })()
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function StaffInfluencerEditModal({ influencer, campaign, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const bankOwner = influencer.bank?.owner || influencer.bank?.holder || ''
 
@@ -1390,6 +1614,7 @@ function StaffInfluencerEditModal({ influencer, onClose, onSaved }) {
           lemon8: formData.get('lemon8'),
         }),
         bank,
+        extraInfo: mergeExtraInfo(influencer.extraInfo, getExtraInfoFromForm(formData)),
       })
       await onSaved?.()
     } catch (error) {
@@ -1408,8 +1633,8 @@ function StaffInfluencerEditModal({ influencer, onClose, onSaved }) {
           <Field label="ชื่ออินฟลูเอนเซอร์" name="name" required value={influencer.name} />
           <div className="field">
             <label>ระดับ</label>
-            <select defaultValue={influencer.tier || TIERS[0]} name="tier">
-              {TIERS.map((tier) => <option key={tier}>{tier}</option>)}
+            <select defaultValue={influencer.tier || KOL_LEVELS[0]} name="tier">
+              {KOL_LEVELS.map((tier) => <option key={tier}>{tier}</option>)}
             </select>
           </div>
           <Field label="ผู้ติดตาม" name="followers" value={influencer.followers} />
@@ -1430,6 +1655,7 @@ function StaffInfluencerEditModal({ influencer, onClose, onSaved }) {
           <Field label="เลขบัญชี / Promptpay" name="bankAccount" value={influencer.bank?.account || ''} />
           <Field label="ชื่อเจ้าของบัญชี" name="bankHolder" value={bankOwner} />
         </div>
+        <ExtraInfoFields campaign={campaign} values={influencer.extraInfo || {}} />
         <div className="modal-actions">
           <button className="btn secondary" onClick={onClose} type="button">ยกเลิก</button>
           <button className="btn primary" disabled={saving} type="submit">{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
@@ -1495,10 +1721,10 @@ function OwnerAddInfluencerForm({ campaign, refreshDashboardData }) {
     <div className="card block-gap">
       <div className="section-title">เพิ่มอินฟลูเอนเซอร์โดยหัวหน้า <span className="hint">ข้ามขั้นตอนทีม → เข้าสู่สถานะ owner_approved ทันที</span></div>
       <div className="grid cols-4 block-gap">
-        <Field label="ชื่ออินฟลูเอนเซอร์" placeholder="เช่น Mega Star KOL" />
-        <Field label="ระดับ" options={TIERS} />
-        <Field label="ผู้ติดตาม" placeholder="เช่น 2.3M" />
-        <Field label="วันที่ดีลงานสำเร็จ" type="date" />
+        <Field label="ชื่ออินฟลูเอนเซอร์" name="name" placeholder="เช่น Mega Star KOL" />
+        <Field label="Level" name="tier" options={KOL_LEVELS} />
+        <Field label="ผู้ติดตาม" name="followers" placeholder="เช่น 2.3M" />
+        <Field label="วันที่ดีลงานสำเร็จ" name="dealDate" type="date" value={todayDateValue()} />
       </div>
       <ChannelFields />
       {canCreateInfluencer ? <button className="btn primary" disabled={saving} onClick={handleAddOwnerInfluencer} type="button">{saving ? 'กำลังบันทึก...' : '+ เพิ่มรายชื่อ (หัวหน้า)'}</button> : null}
@@ -1710,13 +1936,15 @@ function EditableTrackTable({ rows, refreshDashboardData }) {
   )
 }
 
-function Field({ label, name, options, required = false, type = 'text', value, placeholder }) {
+function Field({ label, name, options, required = false, type = 'text', value, placeholder, multiline = false }) {
   return (
     <div className="field">
       <label>{label}</label>
       {options
-        ? <select defaultValue={options[0]} name={name} required={required}>{options.map((option) => <option key={option}>{option}</option>)}</select>
-        : <input defaultValue={value} name={name} placeholder={placeholder} required={required} type={type} />}
+        ? <select defaultValue={value || options[0]} name={name} required={required}>{options.map((option) => <option key={option}>{option}</option>)}</select>
+        : multiline
+          ? <textarea defaultValue={value} name={name} placeholder={placeholder} required={required} rows="3" />
+          : <input defaultValue={value} name={name} placeholder={placeholder} required={required} type={type} />}
     </div>
   )
 }
@@ -1764,6 +1992,9 @@ function MockupModal({ type, context, onClose, onSaved }) {
           deadlineDate: formData.get('deadlineDate'),
           briefFile,
           briefDate: briefFile ? new Date().toISOString().slice(0, 10) : null,
+          campaignSettings: {
+            products: parseOptionLines(formData.get('products')),
+          },
           tierTargets: {
             Nano: formData.get('tierNano'),
             Micro: formData.get('tierMicro'),
@@ -1835,6 +2066,12 @@ function MockupModal({ type, context, onClose, onSaved }) {
                 <input accept=".txt,.doc,.docx,.pdf" name="briefFileUpload" type="file" />
               </div>
               <Field label="Google Doc / URL บรีฟ" name="briefFile" placeholder="https://docs.google.com/..." type="url" />
+            </div>
+            <div className="modal-field">
+              <div className="field">
+                <label>Products สำหรับให้ทีมเลือก</label>
+                <textarea name="products" placeholder="ใส่ชื่อสินค้า บรรทัดละ 1 รายการ" rows="4" />
+              </div>
             </div>
             <div className="grid cols-5">
               <Field label="Nano" name="tierNano" type="number" value="0" />

@@ -125,6 +125,12 @@ export function updateCampaign(id, values) {
   })
 }
 
+export function deleteCampaign(id) {
+  return sendJson(`/api/campaigns/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 export function getInfluencers() {
   return getJson('/api/influencers')
 }

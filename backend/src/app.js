@@ -17,6 +17,7 @@ import {
   createInfluencer,
   createUser,
   deleteBrand,
+  deleteCampaign,
   deleteUser,
   getDashboardRows,
   getDatabaseStatus,
@@ -84,6 +85,7 @@ const apiEndpoints = [
   'DELETE /api/brands/:id',
   'POST /api/campaigns',
   'PATCH /api/campaigns/:id',
+  'DELETE /api/campaigns/:id',
   'POST /api/influencers',
   'PATCH /api/influencers/:id',
 ]
@@ -491,6 +493,28 @@ export async function handleApiRequest(req, res) {
       return sendJson(res, 200, camelizeRow(updated))
     }
 
+    if (req.method === 'DELETE' && resource === 'campaigns' && id) {
+      if (!hasDatabaseUrl()) {
+        return sendJson(res, 409, {
+          error: 'database_not_configured',
+          message: 'Set DATABASE_URL to delete campaigns.',
+        })
+      }
+
+      const session = await requirePermission(req, res, 'campaign.write')
+      if (!session) return
+      const deleted = await deleteCampaign(id)
+
+      if (!deleted) {
+        return sendJson(res, 404, {
+          error: 'not_found',
+          message: `No campaigns item found for id "${id}".`,
+        })
+      }
+
+      return sendJson(res, 200, camelizeRow(deleted))
+    }
+
     if (req.method === 'POST' && resource === 'influencers') {
       if (!hasDatabaseUrl()) {
         return sendJson(res, 409, {
@@ -525,7 +549,7 @@ export async function handleApiRequest(req, res) {
         brand_selected: 'influencer.brand_select',
       }
       const isTrackingUpdate = Object.hasOwn(body, 'draft') || Object.hasOwn(body, 'postDate') || Object.hasOwn(body, 'postLink') || Object.hasOwn(body, 'assetLink')
-      const isProfileUpdate = Object.hasOwn(body, 'name') || Object.hasOwn(body, 'channel') || Object.hasOwn(body, 'channels') || Object.hasOwn(body, 'tier') || Object.hasOwn(body, 'followers') || Object.hasOwn(body, 'dealDate') || Object.hasOwn(body, 'bank')
+      const isProfileUpdate = Object.hasOwn(body, 'name') || Object.hasOwn(body, 'channel') || Object.hasOwn(body, 'channels') || Object.hasOwn(body, 'tier') || Object.hasOwn(body, 'followers') || Object.hasOwn(body, 'dealDate') || Object.hasOwn(body, 'bank') || Object.hasOwn(body, 'extraInfo')
       const permissionKey = statusPermissionMap[body.status] || (isProfileUpdate ? 'influencer.create' : isTrackingUpdate ? 'influencer.track' : 'influencer.review')
       const session = await requirePermission(req, res, permissionKey, body)
       if (!session) return
