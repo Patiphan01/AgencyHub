@@ -39,6 +39,7 @@ function Login() {
     try {
       const session = await loginSession({
         username: formData.get('username') || selectedRole,
+        password: formData.get('password'),
         role: selectedRole,
       })
       const user = session.user

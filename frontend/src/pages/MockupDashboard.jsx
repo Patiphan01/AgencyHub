@@ -28,7 +28,15 @@ const TIER_COLOR = {
 const CHANNELS = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'lemon8']
 const CH_LABEL = { instagram: 'IG', tiktok: 'TikTok', youtube: 'YT', facebook: 'FB', twitter: 'X', lemon8: 'Lemon8' }
 const CH_CLASS = { instagram: 'ig', tiktok: 'tt', youtube: 'yt', facebook: 'fb', twitter: 'tw', lemon8: 'lemon8' }
-const KOL_LEVELS = ['Creator Sales of 5K', 'Nano (1K+ Followers)', 'Micro (10K+ Followers)']
+const KOL_LEVELS = [
+  'Creator Sales of 5K',
+  'Nano (1K+ Followers)',
+  'Micro (10K+ Followers)',
+  'Mid-tier(50K+ Followers)',
+  'Macro (100K+ Followers)',
+  'Creator Sales of 20K',
+  'Creator Sales of 100K',
+]
 const CONTENT_FORMATS = ['รีวิว 1 คลิป 1 ช่องทางคือTikTok', 'รีวิว 1 คลิป 2ช่องทางขึ้นไป']
 const CHANNEL_COUNTS = ['1 ช่องทาง', '2 ช่องทาง', '4 ช่องทาง']
 const CLIP_COUNTS = ['1 คลิป']
@@ -126,6 +134,18 @@ function makeStats(t) {
     confirmed: t.bs,
     posted: t.posted,
   }
+}
+
+function getTierGroup(tier = '') {
+  if (tier.includes('Nano')) return 'Nano'
+  if (tier.includes('Micro')) return 'Micro'
+  if (tier.includes('Mid')) return 'Mid'
+  if (tier.includes('Macro')) return 'Macro'
+  if (tier.includes('100K')) return 'Macro'
+  if (tier.includes('20K')) return 'Micro'
+  if (tier.includes('5K')) return 'Nano'
+  if (tier.includes('Mega')) return 'Mega'
+  return tier
 }
 
 const DB = {
@@ -261,9 +281,12 @@ function Badge({ children, cls = 'muted' }) {
 }
 
 function TierBadge({ tier }) {
+  const tierGroup = getTierGroup(tier)
+  const color = TIER_COLOR[tierGroup] || '#64748B'
+
   return (
-    <span className="badge muted" style={{ background: `${TIER_COLOR[tier]}1A`, color: TIER_COLOR[tier] }}>
-      <span className="tier-dot" style={{ background: TIER_COLOR[tier] }} />
+    <span className="badge muted" style={{ background: `${color}1A`, color }}>
+      <span className="tier-dot" style={{ background: color }} />
       {tier}
     </span>
   )
@@ -579,8 +602,8 @@ function MockupDashboard() {
           ) : null}
 
           {dashboardData.brands.length > 0 && state.role === 'brand' && (state.view === 'dashboard'
-            ? <BrandDashboard go={go} />
-            : <BrandCampaign campaign={getCampaign(dashboardData.brands[0].id, state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} refreshDashboardData={refreshDashboardData} />)}
+            ? <BrandDashboard allCampaigns={allCampaigns} go={go} />
+            : <BrandCampaign campaign={allCampaigns.find((campaign) => campaign.id === state.campaignId)} selectedCandidateIds={selectedCandidateIds} setSelectedCandidateIds={setSelectedCandidateIds} state={state} go={go} refreshDashboardData={refreshDashboardData} />)}
 
           {state.role === 'owner' && (state.view === 'dashboard'
             ? <OwnerDashboard allCampaigns={allCampaigns} go={go} openModal={setModal} refreshDashboardData={refreshDashboardData} />
@@ -616,12 +639,15 @@ function MockupDashboard() {
   }
 }
 
-function BrandDashboard({ go }) {
+function BrandDashboard({ allCampaigns, go }) {
   const db = useDashboardData()
-  const brand = db.brands[0]
-  const allTarget = brand.campaigns.reduce((sum, campaign) => sum + campaign.target, 0)
-  const allSelected = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
-  const allPosted = brand.campaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'posted'), 0)
+  // Test mode: show every campaign to brand users until real brand-login scoping is wired.
+  // Production mode should filter this list by the logged-in brand account / assigned brandId.
+  const visibleCampaigns = allCampaigns
+  const brand = { ...db.brands[0], campaigns: visibleCampaigns }
+  const allTarget = visibleCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
+  const allSelected = visibleCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
+  const allPosted = visibleCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'posted'), 0)
 
   return (
     <>
@@ -632,7 +658,7 @@ function BrandDashboard({ go }) {
         <Stat label="อินฟลูที่ยืนยันแล้ว (ทุกแคมเปญ)" value={allSelected} sub={`/ ${allTarget}`} />
         <Stat label="ลงคลิปแล้วรวม" value={allPosted} sub={`/ ${allSelected}`} />
       </div>
-      <div className="section-title">แคมเปญของคุณ</div>
+      <div className="section-title">แคมเปญทั้งหมด (โหมดทดสอบ)</div>
       <div className="grid cols-2">
         {brand.campaigns.map((campaign) => {
           const selected = totalTier(campaign, 'brandSelected')
@@ -643,7 +669,7 @@ function BrandDashboard({ go }) {
               campaign={{ ...campaign, meta: `เริ่มลงคลิป ${campaign.startDate} · ครบกำหนด ${campaign.deadlineDate}` }}
               badge={pendingForBrand > 0 ? <Badge cls="warning">{pendingForBrand} รายชื่อรอคุณตรวจ</Badge> : <Badge cls="primary">{campaign.status}</Badge>}
               key={campaign.id}
-              onClick={() => go({ view: 'campaign', brandId: brand.id, campaignId: campaign.id, tab: 'select' })}
+              onClick={() => go({ view: 'campaign', brandId: campaign.brandId, campaignId: campaign.id, tab: 'select' })}
             >
               <ProgressMetric label="ยืนยันแล้ว" value={selected} max={campaign.target} />
               <ProgressMetric color="#1E9E5C" label="ลงคลิปแล้ว" value={posted} max={selected} />
@@ -656,6 +682,10 @@ function BrandDashboard({ go }) {
 }
 
 function BrandCampaign({ campaign, selectedCandidateIds, setSelectedCandidateIds, state, go, refreshDashboardData }) {
+  if (!campaign) {
+    return <EmptyState icon="แคมเปญ" title="ไม่พบแคมเปญ" desc="กลับไปเลือกแคมเปญอีกครั้งจากหน้ารวม" />
+  }
+
   return (
     <>
       <BackButton onClick={() => go({ view: 'dashboard', campaignId: null })} />
@@ -761,6 +791,7 @@ function BrandProgressTab({ campaign }) {
 function OwnerDashboard({ allCampaigns, go, openModal, refreshDashboardData }) {
   const db = useDashboardData()
   const canWriteBrand = useCan('brand.write')
+  const canManageEmployees = useCan('employee.manage')
   const sumTarget = allCampaigns.reduce((sum, campaign) => sum + campaign.target, 0)
   const sumConfirmed = allCampaigns.reduce((sum, campaign) => sum + totalTier(campaign, 'brandSelected'), 0)
   const pendingReview = allCampaigns.reduce((sum, campaign) => sum + campaign.influencers.filter((item) => item.status === 'pending_owner' || item.status === 'senior_approved').length, 0)
@@ -772,7 +803,11 @@ function OwnerDashboard({ allCampaigns, go, openModal, refreshDashboardData }) {
           <h1 className="page-title">ภาพรวมทั้งหมด</h1>
           <p className="page-sub no-margin">สรุปทุกแบรนด์และแคมเปญที่กำลังดำเนินการ</p>
         </div>
-        {canWriteBrand ? <button className="btn primary" onClick={() => openModal('brand')} type="button">+ เพิ่มแบรนด์ใหม่</button> : null}
+        <div className="permission-actions">
+          {canManageEmployees ? <button className="btn secondary" onClick={() => openModal({ type: 'user', role: 'brand' })} type="button">+ สร้างบัญชี Brand</button> : null}
+          {canManageEmployees ? <button className="btn secondary" onClick={() => openModal({ type: 'user', role: 'staff' })} type="button">+ สร้างบัญชี Staff</button> : null}
+          {canWriteBrand ? <button className="btn primary" onClick={() => openModal('brand')} type="button">+ เพิ่มแบรนด์ใหม่</button> : null}
+        </div>
       </div>
       <div className="grid cols-4 block-gap owner-stats">
         <Stat label="แบรนด์ที่ดูแล" value={db.brands.length} />
@@ -845,8 +880,12 @@ function SeniorReviewerPanel({ openModal, refreshDashboardData }) {
   return (
     <div className="card block-gap">
       <div className="flex-between table-heading">
-        <div className="section-title no-margin">Senior Reviewer <span className="hint">ได้รับสิทธิ์ช่วยคัดเลือกก่อนถึงหัวหน้า</span></div>
-        {canManageEmployees ? <button className="btn secondary sm" onClick={() => openModal('senior')} type="button">จัดการสิทธิ์</button> : null}
+        <div className="section-title no-margin">บัญชีผู้ใช้ <span className="hint">Mockup สำหรับ Brand / Staff login ในอนาคต</span></div>
+        <div className="permission-actions">
+          {canManageEmployees ? <button className="btn secondary sm" onClick={() => openModal({ type: 'user', role: 'brand' })} type="button">+ Brand user</button> : null}
+          {canManageEmployees ? <button className="btn secondary sm" onClick={() => openModal({ type: 'user', role: 'staff' })} type="button">+ Staff user</button> : null}
+          {canManageEmployees ? <button className="btn secondary sm" onClick={() => openModal('senior')} type="button">+ Senior reviewer</button> : null}
+        </div>
       </div>
       <div className="senior-list">
         {db.seniors.map((senior) => (
@@ -854,8 +893,9 @@ function SeniorReviewerPanel({ openModal, refreshDashboardData }) {
             <div className="senior-avatar">{senior.name.slice(-1)}</div>
             <div>
               <div className="cell-name">{senior.name}</div>
-              <div className="cell-sub">{senior.role}</div>
+              <div className="cell-sub">{senior.username ? `@${senior.username} · ` : ''}{senior.role}</div>
             </div>
+            <Badge cls={senior.roleId === 'brand' ? 'primary' : senior.roleId === 'owner' ? 'success' : 'muted'}>{senior.roleId || senior.role}</Badge>
             <Badge cls={senior.permissions?.includes('influencer.review') ? 'purple' : 'muted'}>{senior.permissions?.includes('influencer.review') ? '✓ มีสิทธิ์คัด' : 'ไม่มีสิทธิ์คัด'}</Badge>
             {canManagePermissions ? <button className="btn xs secondary" onClick={() => togglePermission(senior, 'influencer.review')} type="button">{senior.permissions?.includes('influencer.review') ? 'ถอนสิทธิ์คัด' : 'ให้สิทธิ์คัด'}</button> : null}
             {canManageEmployees && senior.id !== 'owner' ? <button className="btn xs secondary" onClick={() => disableUser(senior)} type="button">ปิดใช้งาน</button> : null}
@@ -1952,7 +1992,14 @@ function Field({ label, name, options, required = false, type = 'text', value, p
 function MockupModal({ type, context, onClose, onSaved }) {
   const isBrand = type === 'brand'
   const isCampaign = type === 'campaign'
-  const isEmployee = type === 'senior'
+  const isEmployee = type === 'senior' || type === 'user'
+  const userRole = context?.role || 'staff'
+  const isBrandUser = isEmployee && userRole === 'brand'
+  const defaultUserPermissions = type === 'senior'
+    ? ['brand.read', 'influencer.review']
+    : userRole === 'brand'
+      ? ['brand.read', 'influencer.brand_select']
+      : ['brand.read', 'influencer.create', 'influencer.track']
   const [saving, setSaving] = useState(false)
   const [permissionOptions, setPermissionOptions] = useState([])
 
@@ -2012,7 +2059,9 @@ function MockupModal({ type, context, onClose, onSaved }) {
           name: formData.get('name'),
           title: formData.get('title'),
           email: formData.get('email'),
-          role: 'staff',
+          username: formData.get('username'),
+          password: formData.get('password'),
+          role: userRole,
           permissions: formData.getAll('permissions'),
         })
         await onSaved?.()
@@ -2028,7 +2077,8 @@ function MockupModal({ type, context, onClose, onSaved }) {
       await onSaved?.()
       onClose()
     } catch (error) {
-      alert(`ยังสร้างแบรนด์ไม่ได้: ${error.message}`)
+      const actionLabel = isCampaign ? 'แคมเปญ' : isEmployee ? 'พนักงาน' : 'แบรนด์'
+      alert(`ยังสร้าง${actionLabel}ไม่ได้: ${error.message}`)
     } finally {
       setSaving(false)
     }
@@ -2037,8 +2087,8 @@ function MockupModal({ type, context, onClose, onSaved }) {
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
       <form className="modal" onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit} role="dialog" aria-modal="true">
-        <h2>{isBrand ? 'เพิ่มแบรนด์ใหม่' : isEmployee ? 'เพิ่ม Senior Reviewer' : 'เพิ่มแคมเปญใหม่'}</h2>
-        <div className="modal-sub">{isBrand ? 'กรอกข้อมูลแบรนด์เพื่อเริ่มสร้างแคมเปญ' : 'Senior จะสามารถช่วยตรวจรายชื่ออินฟลูก่อนส่งถึงหัวหน้า'}</div>
+        <h2>{isBrand ? 'เพิ่มแบรนด์ใหม่' : isEmployee ? isBrandUser ? 'สร้างบัญชี Brand' : type === 'senior' ? 'เพิ่ม Senior Reviewer' : 'สร้างบัญชี Staff' : 'เพิ่มแคมเปญใหม่'}</h2>
+        <div className="modal-sub">{isBrand ? 'กรอกข้อมูลแบรนด์เพื่อเริ่มสร้างแคมเปญ' : isEmployee ? 'Mockup สำหรับเตรียมระบบ Login แยกบัญชีในอนาคต' : 'กรอกข้อมูลแคมเปญเพื่อเริ่มรับรายชื่ออินฟลู'}</div>
         {isBrand ? (
           <>
             <div className="grid cols-2">
@@ -2083,15 +2133,17 @@ function MockupModal({ type, context, onClose, onSaved }) {
           </>
         ) : isEmployee ? (
           <div className="grid cols-2">
-            <Field label="ชื่อพนักงาน" name="name" placeholder="ชื่อ-นามสกุล" required />
-            <Field label="ตำแหน่ง" name="title" placeholder="เช่น Senior Coordinator" />
-            <Field label="อีเมล" name="email" placeholder="staff@agency.com" type="email" />
+            <Field label={isBrandUser ? 'ชื่อผู้ใช้แบรนด์' : 'ชื่อพนักงาน'} name="name" placeholder={isBrandUser ? 'เช่น Brand Manager' : 'ชื่อ-นามสกุล'} required />
+            <Field label="ตำแหน่ง" name="title" placeholder={isBrandUser ? 'เช่น Brand Manager' : 'เช่น KOL Specialist'} />
+            <Field label="อีเมล" name="email" placeholder={isBrandUser ? 'brand@company.com' : 'staff@agency.com'} type="email" />
+            <Field label="Username" name="username" placeholder={isBrandUser ? 'brand-skinglow' : 'staff-nan'} required />
+            <Field label="Password (mockup)" name="password" placeholder="ใช้สำหรับทดสอบ login" required type="password" />
             <div className="field">
               <label>สิทธิ์</label>
               <div className="permission-actions">
                 {permissionOptions.map((permission) => (
                   <label className="role-chip" key={permission.key}>
-                    <input defaultChecked={['brand.read', 'influencer.review'].includes(permission.key)} name="permissions" type="checkbox" value={permission.key} />
+                    <input defaultChecked={defaultUserPermissions.includes(permission.key)} name="permissions" type="checkbox" value={permission.key} />
                     {permission.key}
                   </label>
                 ))}

@@ -102,6 +102,7 @@ export async function getRowById(tableName, id) {
 export async function getDashboardRows() {
   const sql = await getSql()
   if (!sql) return null
+  await ensureDataSchema()
   await ensureAuthSchema()
 
   const [brandRows, campaignRows, influencerRows, tierRows, userRows] = await Promise.all([
@@ -127,7 +128,7 @@ export async function getDashboardRows() {
         '[]'::jsonb
       ) as permissions
       from app_users u
-      where u.active = true and u.role_id in ('owner', 'staff')
+      where u.active = true
       order by u.role_id, u.name
     `,
   ])
@@ -161,6 +162,63 @@ const defaultRolePermissions = {
 }
 
 let authSchemaReady = false
+let dataSchemaReady = false
+
+export async function ensureDataSchema() {
+  const sql = await getSql()
+  if (!sql || dataSchemaReady) return
+
+  await sql.begin(async (tx) => {
+    const requiredColumns = {
+      campaigns: {
+        start_date: 'text',
+        deadline_date: 'text',
+        target: 'integer',
+        brief_file: 'text',
+        brief_version: 'text',
+        brief_date: 'text',
+        tier_stats: 'jsonb',
+        campaign_settings: 'jsonb',
+      },
+      influencers: {
+        channels: 'jsonb',
+        added_by_role: 'text',
+        draft: 'text',
+        asset_link: 'text',
+        bank: 'jsonb',
+        senior_approval: 'jsonb',
+        extra_info: 'jsonb',
+      },
+      tier_targets: {
+        campaign_id: 'text references campaigns(id) on delete cascade',
+        sourced: 'integer',
+        confirmed: 'integer',
+        posted: 'integer',
+      },
+      brief_versions: {
+        campaign_id: 'text references campaigns(id) on delete cascade',
+        brief_file: 'text',
+        brief_date: 'text',
+      },
+    }
+
+    for (const [tableName, columns] of Object.entries(requiredColumns)) {
+      const existingRows = await tx`
+        select column_name
+        from information_schema.columns
+        where table_schema = 'public' and table_name = ${tableName}
+      `
+      const existingColumns = new Set(existingRows.map((row) => row.column_name))
+
+      for (const [columnName, definition] of Object.entries(columns)) {
+        if (existingColumns.has(columnName)) continue
+        await tx.unsafe(`alter table ${tableName} add column ${columnName} ${definition}`)
+      }
+    }
+  })
+
+  dataSchemaReady = true
+}
 
 export async function ensureAuthSchema() {
   const sql = await getSql()
@@ -187,6 +245,8 @@ export async function ensureAuthSchema() {
         id text primary key,
         name text not null,
         email text unique,
+        username text unique,
+        password text,
         role_id text references roles(id),
         title text,
         active boolean not null default true,
@@ -194,6 +254,12 @@ export async function ensureAuthSchema() {
         updated_at timestamptz not null default now()
       )
     `
+    await tx`
+      alter table app_users
+        add column if not exists username text,
+        add column if not exists password text
+    `
+    await tx`create unique index if not exists app_users_username_key on app_users(username) where username is not null`
     await tx`
       create table if not exists user_permissions (
         user_id text references app_users(id) on delete cascade,
@@ -233,11 +299,13 @@ export async function ensureAuthSchema() {
 
     for (const [id, name, email, roleId, title] of defaults) {
       await tx`
-        insert into app_users (id, name, email, role_id, title, active)
-        values (${id}, ${name}, ${email}, ${roleId}, ${title}, true)
+        insert into app_users (id, name, email, username, password, role_id, title, active)
+        values (${id}, ${name}, ${email}, ${id}, ${id}, ${roleId}, ${title}, true)
         on conflict (id) do update set
           name = excluded.name,
           email = excluded.email,
+          username = coalesce(app_users.username, excluded.username),
+          password = coalesce(app_users.password, excluded.password),
           role_id = excluded.role_id,
           title = excluded.title,
           active = excluded.active,
@@ -255,6 +323,7 @@ function normalizeUser(row) {
     id: row.id,
     name: row.name,
     email: row.email,
+    username: row.username,
     role: row.role_id,
     roleId: row.role_id,
     title: row.title,
@@ -263,7 +332,7 @@ function normalizeUser(row) {
   }
 }
 
-export async function getUserSession(userIdOrRole = 'brand') {
+export async function getUserSession(userIdOrRole = 'brand', password) {
   const sql = await getSql()
   if (!sql) return null
   await ensureAuthSchema()
@@ -287,12 +356,24 @@ export async function getUserSession(userIdOrRole = 'brand') {
       '[]'::jsonb
     ) as permissions
     from app_users u
-    where u.active = true and (lower(u.id) = ${value} or lower(u.role_id) = ${value} or lower(coalesce(u.email, '')) = ${value})
+    where u.active = true and (
+      lower(u.id) = ${value}
+      or lower(u.role_id) = ${value}
+      or lower(coalesce(u.email, '')) = ${value}
+      or lower(coalesce(u.username, '')) = ${value}
+    )
     order by case when lower(u.id) = ${value} then 0 else 1 end
     limit 1
   `
 
-  return normalizeUser(rows[0])
+  const row = rows[0]
+  if (!row) return null
+
+  // Mockup login only: plain-text passwords are for prototype testing.
+  // Production auth should replace this with hashed passwords or an auth provider.
+  if (password && row.password && row.password !== password) return null
+
+  return normalizeUser(row)
 }
 
 export async function listPermissions() {
@@ -338,13 +419,15 @@ export async function createUser(values) {
   if (!name) throw new Error('Employee name is required.')
 
   const roleId = String(values.roleId || values.role || 'staff').toLowerCase()
-  const id = await createUniqueId(sql, 'app_users', values.id || values.email || name, 'user')
+  const username = String(values.username || values.email || '').trim()
+  const password = String(values.password || '').trim()
+  const id = await createUniqueId(sql, 'app_users', values.id || username || values.email || name, 'user')
   const permissionKeys = Array.isArray(values.permissions) ? values.permissions : defaultRolePermissions[roleId] || []
 
   return sql.begin(async (tx) => {
     const rows = await tx`
-      insert into app_users (id, name, email, role_id, title, active)
-      values (${id}, ${name}, ${values.email || null}, ${roleId}, ${values.title || null}, ${values.active !== false})
+      insert into app_users (id, name, email, username, password, role_id, title, active)
+      values (${id}, ${name}, ${values.email || null}, ${username || null}, ${password || null}, ${roleId}, ${values.title || null}, ${values.active !== false})
       returning *
     `
 
@@ -368,6 +451,8 @@ export async function updateUser(id, values) {
   const allowedFields = {
     name: 'name',
     email: 'email',
+    username: 'username',
+    password: 'password',
     role: 'role_id',
     roleId: 'role_id',
     title: 'title',
@@ -419,6 +504,7 @@ export async function deleteUser(id) {
 export async function updateInfluencer(id, values) {
   const sql = await getSql()
   if (!sql) return null
+  await ensureDataSchema()
 
   const allowedFields = {
     name: 'name',
@@ -578,6 +664,7 @@ export async function updateBrand(id, values) {
 export async function deleteBrand(id) {
   const sql = await getSql()
   if (!sql) return null
+  await ensureDataSchema()
 
   return sql.begin(async (tx) => {
     const campaigns = await tx`select id from campaigns where brand_id = ${id}`
@@ -596,6 +683,7 @@ export async function deleteBrand(id) {
 export async function deleteCampaign(id) {
   const sql = await getSql()
   if (!sql) return null
+  await ensureDataSchema()
 
   return sql.begin(async (tx) => {
     const campaignRows = await tx`select * from campaigns where id = ${id} limit 1`
@@ -625,6 +713,7 @@ export async function deleteCampaign(id) {
 export async function createCampaign(values) {
   const sql = await getSql()
   if (!sql) return null
+  await ensureDataSchema()
 
   const name = String(values.name || '').trim()
   const brandId = String(values.brandId || values.brand_id || '').trim()
@@ -740,6 +829,7 @@ export async function createCampaign(values) {
 export async function updateCampaign(id, values) {
   const sql = await getSql()
   if (!sql) return null
+  await ensureDataSchema()
 
   const allowedFields = {
     name: 'name',
@@ -796,6 +886,7 @@ export async function updateCampaign(id, values) {
 export async function createInfluencer(values) {
   const sql = await getSql()
   if (!sql) return null
+  await ensureDataSchema()
 
   const name = String(values.name || '').trim()
   const campaignId = String(values.campaignId || values.campaign_id || '').trim()

@@ -41,7 +41,7 @@ const jsonHeaders = {
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-AgencyHub-User-Id,X-AgencyHub-Role',
 }
 
 function sendJson(res, statusCode, payload) {
@@ -161,7 +161,7 @@ async function getRequestSession(req, body) {
   }
 
   const userId = req.headers['x-agencyhub-user-id'] || body?.userId || body?.username || req.headers['x-agencyhub-role'] || body?.role
-  return getUserSession(userId)
+  return getUserSession(userId, body?.password)
 }
 
 function sendForbidden(res, permissionKey) {
@@ -227,8 +227,20 @@ function emptyTierStats() {
   )
 }
 
+function getTierGroup(tier = '') {
+  if (tier.includes('Nano')) return 'Nano'
+  if (tier.includes('Micro')) return 'Micro'
+  if (tier.includes('Mid')) return 'Mid'
+  if (tier.includes('Macro')) return 'Macro'
+  if (tier.includes('100K')) return 'Macro'
+  if (tier.includes('20K')) return 'Micro'
+  if (tier.includes('5K')) return 'Nano'
+  if (tier.includes('Mega')) return 'Mega'
+  return tier === 'Mega/KOL' ? 'Mega' : tier
+}
+
 function applyInfluencerToTierStats(tierStats, influencer) {
-  const tier = influencer.tier === 'Mega/KOL' ? 'Mega' : influencer.tier
+  const tier = getTierGroup(influencer.tier)
   if (!tierStats[tier]) return
 
   tierStats[tier].sourced += 1
@@ -311,6 +323,7 @@ function buildDashboardData(rows) {
     seniors: (rows.users?.length ? rows.users : seniors).map((user) => ({
       id: user.id,
       name: user.name,
+      roleId: user.roleId || user.role_id || user.role,
       role: user.title || user.role_id || user.role || 'Staff',
       email: user.email,
       active: user.active,

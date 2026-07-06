@@ -16,7 +16,7 @@ async function getJson(path) {
   const contentType = response.headers.get('content-type') || ''
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`)
+    throw new Error(await getErrorMessage(response, contentType))
   }
 
   if (!contentType.includes('application/json')) {
@@ -38,7 +38,7 @@ async function sendJson(path, options) {
   const contentType = response.headers.get('content-type') || ''
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`)
+    throw new Error(await getErrorMessage(response, contentType))
   }
 
   if (!contentType.includes('application/json')) {
@@ -46,6 +46,20 @@ async function sendJson(path, options) {
   }
 
   return response.json()
+}
+
+async function getErrorMessage(response, contentType) {
+  if (contentType.includes('application/json')) {
+    try {
+      const body = await response.json()
+      if (body?.message) return body.message
+      if (body?.error) return body.error
+    } catch {
+      // Fall through to the generic response status message.
+    }
+  }
+
+  return `API request failed with status ${response.status}`
 }
 
 export function getHealthStatus() {
