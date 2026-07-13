@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+const SESSION_STORAGE_KEY = 'agencyhub-session'
 
 function getSessionHeaders() {
   const userId = localStorage.getItem('agencyhub-user-id')
@@ -72,6 +73,28 @@ export function getMockData() {
 
 export function getSession() {
   return getJson('/api/session')
+}
+
+export function getCachedSession() {
+  try {
+    const value = localStorage.getItem(SESSION_STORAGE_KEY)
+    return value ? JSON.parse(value) : null
+  } catch {
+    return null
+  }
+}
+
+export function setCachedSession(session) {
+  if (!session?.user) {
+    localStorage.removeItem(SESSION_STORAGE_KEY)
+    return
+  }
+
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+}
+
+export function clearCachedSession() {
+  localStorage.removeItem(SESSION_STORAGE_KEY)
 }
 
 export function loginSession(values) {

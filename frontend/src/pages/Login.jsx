@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
-import { getRoles, loginSession } from '../services/apiClient'
+import { getRoles, loginSession, setCachedSession } from '../services/apiClient'
 
 const fallbackRoles = ['Brand', 'Owner', 'Staff']
 
@@ -14,6 +14,7 @@ const roleLabels = {
 function Login() {
   const [selectedRole, setSelectedRole] = useState('Owner')
   const [roles, setRoles] = useState(fallbackRoles)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
   const navigate = useNavigate()
   const { language, t, toggleLanguage } = useLanguage()
 
@@ -34,9 +35,12 @@ function Login() {
 
   async function handleLogin(event) {
     event.preventDefault()
+    if (isLoggingIn) return
+
     const formData = new FormData(event.currentTarget)
 
     try {
+      setIsLoggingIn(true)
       const session = await loginSession({
         username: formData.get('username') || selectedRole,
         password: formData.get('password'),
@@ -46,9 +50,12 @@ function Login() {
       localStorage.setItem('agencyhub-role', user.role || selectedRole)
       localStorage.setItem('agencyhub-user-id', user.id)
       localStorage.setItem('agencyhub-permissions', JSON.stringify(user.permissions || []))
+      setCachedSession(session)
       navigate('/dashboard')
     } catch (error) {
       alert(`เข้าสู่ระบบไม่ได้: ${error.message}`)
+    } finally {
+      setIsLoggingIn(false)
     }
   }
 
@@ -99,7 +106,9 @@ function Login() {
             </div>
           </div>
 
-          <button className="login-button" type="submit">{t.login}</button>
+          <button className="login-button" disabled={isLoggingIn} type="submit">
+            {isLoggingIn ? 'Logging in...' : t.login}
+          </button>
         </form>
       </section>
     </main>

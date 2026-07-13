@@ -5,9 +5,11 @@ import {
   createCampaign,
   createInfluencer,
   createUser,
+  clearCachedSession,
   deleteBrand,
   deleteCampaign,
   deleteUser,
+  getCachedSession,
   getDashboardData,
   getPermissions,
   getSession,
@@ -507,8 +509,10 @@ function MockupDashboard() {
 
   useEffect(() => {
     let cancelled = false
+    const cachedSession = getCachedSession()
+    const sessionPromise = cachedSession?.user ? Promise.resolve(cachedSession) : getSession()
 
-    Promise.all([getSession(), getDashboardData()])
+    Promise.all([sessionPromise, getDashboardData()])
       .then(([sessionData, data]) => {
         if (cancelled) return
         const user = sessionData?.user || null
@@ -551,6 +555,7 @@ function MockupDashboard() {
     localStorage.removeItem('agencyhub-role')
     localStorage.removeItem('agencyhub-user-id')
     localStorage.removeItem('agencyhub-permissions')
+    clearCachedSession()
     navigate('/login')
   }
 

@@ -99,12 +99,7 @@ export async function getRowById(tableName, id) {
   return rows[0] || null
 }
 
-export async function getDashboardRows() {
-  const sql = await getSql()
-  if (!sql) return null
-  await ensureDataSchema()
-  await ensureAuthSchema()
-
+async function queryDashboardRows(sql) {
   const [brandRows, campaignRows, influencerRows, tierRows, userRows] = await Promise.all([
     sql`select * from brands order by id`,
     sql`select * from campaigns order by id`,
@@ -142,6 +137,22 @@ export async function getDashboardRows() {
   }
 }
 
+export async function getDashboardRows() {
+  const sql = await getSql()
+  if (!sql) return null
+
+  try {
+    const rows = await queryDashboardRows(sql)
+    dataSchemaReady = true
+    authSchemaReady = true
+    return rows
+  } catch (error) {
+    if (!isSchemaMissingError(error)) throw error
+    await Promise.all([ensureDataSchema(), ensureAuthSchema()])
+    return queryDashboardRows(sql)
+  }
+}
+
 export const permissionDefinitions = [
   ['brand.read', 'View brands', 'View brand and campaign data'],
   ['brand.write', 'Create and edit brands', 'Create or update brand records'],
@@ -163,12 +174,19 @@ const defaultRolePermissions = {
 
 let authSchemaReady = false
 let dataSchemaReady = false
+let authSchemaPromise = null
+let dataSchemaPromise = null
+
+function isSchemaMissingError(error) {
+  return error?.code === '42P01' || error?.code === '42703'
+}
 
 export async function ensureDataSchema() {
   const sql = await getSql()
   if (!sql || dataSchemaReady) return
+  if (dataSchemaPromise) return dataSchemaPromise
 
-  await sql.begin(async (tx) => {
+  dataSchemaPromise = sql.begin(async (tx) => {
     const requiredColumns = {
       campaigns: {
         start_date: 'text',
@@ -215,16 +233,21 @@ export async function ensureDataSchema() {
         await tx.unsafe(`alter table ${tableName} add column ${columnName} ${definition}`)
       }
     }
+  }).then(() => {
+    dataSchemaReady = true
+  }).finally(() => {
+    dataSchemaPromise = null
   })
 
-  dataSchemaReady = true
+  return dataSchemaPromise
 }
 
 export async function ensureAuthSchema() {
   const sql = await getSql()
   if (!sql || authSchemaReady) return
+  if (authSchemaPromise) return authSchemaPromise
 
-  await sql.begin(async (tx) => {
+  authSchemaPromise = sql.begin(async (tx) => {
     await tx`
       create table if not exists permissions (
         key text primary key,
@@ -312,9 +335,13 @@ export async function ensureAuthSchema() {
           updated_at = now()
       `
     }
+  }).then(() => {
+    authSchemaReady = true
+  }).finally(() => {
+    authSchemaPromise = null
   })
 
-  authSchemaReady = true
+  return authSchemaPromise
 }
 
 function normalizeUser(row) {
@@ -332,13 +359,8 @@ function normalizeUser(row) {
   }
 }
 
-export async function getUserSession(userIdOrRole = 'brand', password) {
-  const sql = await getSql()
-  if (!sql) return null
-  await ensureAuthSchema()
-
-  const value = String(userIdOrRole || 'brand').toLowerCase()
-  const rows = await sql`
+function queryUserSession(sql, value) {
+  return sql`
     select u.*, coalesce(
       (
         select jsonb_agg(distinct permission_key)
@@ -365,6 +387,28 @@ export async function getUserSession(userIdOrRole = 'brand', password) {
     order by case when lower(u.id) = ${value} then 0 else 1 end
     limit 1
   `
+}
+
+export async function getUserSession(userIdOrRole = 'brand', password) {
+  const sql = await getSql()
+  if (!sql) return null
+
+  const value = String(userIdOrRole || 'brand').toLowerCase()
+  let rows
+
+  try {
+    rows = await queryUserSession(sql, value)
+    authSchemaReady = true
+  } catch (error) {
+    if (!isSchemaMissingError(error)) throw error
+    await ensureAuthSchema()
+    rows = await queryUserSession(sql, value)
+  }
+
+  if (!rows.length && !authSchemaReady) {
+    await ensureAuthSchema()
+    rows = await queryUserSession(sql, value)
+  }
 
   const row = rows[0]
   if (!row) return null
